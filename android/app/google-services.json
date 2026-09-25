@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "627288522489",
+    "project_id": "campusfind-26ac2",
+    "storage_bucket": "campusfind-26ac2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:627288522489:android:3a9a5acd901f06c78f6c28",
+        "android_client_info": {
+          "package_name": "com.CampusFind.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMT3siRubQdeTke30ThJFw_HxWSfPyBuw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:627288522489:android:f9f65d92d11a43fa8f6c28",
+        "android_client_info": {
+          "package_name": "com.campusfind.flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMT3siRubQdeTke30ThJFw_HxWSfPyBuw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
