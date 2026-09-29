@@ -1,7 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../../home/presentation/home_screen.dart';
+import '../data/auth_service.dart';
+
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
+
+  Future<void> _showSignInDialog(BuildContext context) async {
+    final signedIn = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const _StudentSignInDialog(),
+    );
+
+    if (signedIn == true && context.mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (context) => const HomeScreen()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +124,7 @@ class LoginScreen extends StatelessWidget {
                     SizedBox(
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () => _showSignInDialog(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
@@ -168,6 +185,119 @@ class LoginScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _StudentSignInDialog extends StatefulWidget {
+  const _StudentSignInDialog();
+
+  @override
+  State<_StudentSignInDialog> createState() => _StudentSignInDialogState();
+}
+
+class _StudentSignInDialogState extends State<_StudentSignInDialog> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isSigningIn = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signIn() async {
+    if (_isSigningIn) return;
+
+    if (_emailController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your email and password.');
+      return;
+    }
+
+    setState(() {
+      _isSigningIn = true;
+      _errorMessage = null;
+    });
+
+    final error = await AuthService().signInStudent(
+      _emailController.text,
+      _passwordController.text,
+    );
+    if (!mounted) return;
+
+    if (error == null) {
+      Navigator.of(context).pop(true);
+    } else {
+      setState(() {
+        _isSigningIn = false;
+        _errorMessage = error;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !_isSigningIn,
+      child: AlertDialog(
+        title: const Text('Student sign in'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _emailController,
+                enabled: !_isSigningIn,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autocorrect: false,
+                decoration: const InputDecoration(labelText: 'Email'),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passwordController,
+                enabled: !_isSigningIn,
+                obscureText: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _signIn(),
+                decoration: const InputDecoration(labelText: 'Password'),
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _isSigningIn ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: _isSigningIn ? null : _signIn,
+            child: _isSigningIn
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      semanticsLabel: 'Signing in',
+                    ),
+                  )
+                : const Text('Sign in'),
+          ),
+        ],
       ),
     );
   }
