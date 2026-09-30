@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Download Flutter artifacts (Material fonts used by widget tests)
+        run: flutter precache --universal --no-android --no-ios --no-web --no-linux --no-macos --no-windows --no-fuchsia
+
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test
         continue-on-error: true
