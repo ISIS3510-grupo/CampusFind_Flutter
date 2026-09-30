@@ -2,22 +2,92 @@ import 'package:flutter/material.dart';
 
 import '../../home/presentation/home_screen.dart';
 import '../data/auth_service.dart';
+import '../data/biometric_service.dart';
 
-class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({
+    super.key,
+    this.authService = const AuthService(),
+    this.biometricService,
+  });
 
-  Future<void> _showSignInDialog(BuildContext context) async {
+  final AuthService authService;
+  final BiometricService? biometricService;
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  late final _biometricService = widget.biometricService ?? BiometricService();
+  bool _checkingAccess = false;
+
+  Future<void> _handleStudentAccess() async {
+    if (_checkingAccess) return;
+    setState(() => _checkingAccess = true);
+
+    try {
+      if (!widget.authService.hasCurrentUser) {
+        await _showSignInDialog();
+        return;
+      }
+
+      final available = await _biometricService.canAuthenticate();
+      if (!mounted) return;
+      if (!available) {
+        await _showSignInDialog();
+        return;
+      }
+
+      final authenticated = await _biometricService.authenticate();
+      if (!mounted) return;
+      if (authenticated != true) {
+        // A failed or cancelled prompt cannot continue to the role check.
+        await _showSignInDialog();
+        return;
+      }
+      if (!widget.authService.hasCurrentUser) {
+        await _showSignInDialog();
+        return;
+      }
+
+      // Existing Firebase session is still validated as a student.
+      final error = await widget.authService.verifyStudentRole();
+      if (!mounted) return;
+      if (error == null) {
+        _openHome();
+      } else {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error)));
+      }
+    } catch (_) {
+      if (mounted) await _showSignInDialog();
+    } finally {
+      if (mounted) setState(() => _checkingAccess = false);
+    }
+  }
+
+  Future<void> _showSignInDialog() async {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     final signedIn = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const _StudentSignInDialog(),
+      builder: (context) =>
+          _StudentSignInDialog(authService: widget.authService),
     );
 
-    if (signedIn == true && context.mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (context) => const HomeScreen()),
-      );
+    if (signedIn == true && mounted) {
+      _openHome();
     }
+  }
+
+  void _openHome() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (context) => HomeScreen(authService: widget.authService),
+      ),
+    );
   }
 
   @override
@@ -124,7 +194,9 @@ class LoginScreen extends StatelessWidget {
                     SizedBox(
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: () => _showSignInDialog(context),
+                        onPressed: _checkingAccess
+                            ? null
+                            : _handleStudentAccess,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
@@ -191,7 +263,9 @@ class LoginScreen extends StatelessWidget {
 }
 
 class _StudentSignInDialog extends StatefulWidget {
-  const _StudentSignInDialog();
+  const _StudentSignInDialog({required this.authService});
+
+  final AuthService authService;
 
   @override
   State<_StudentSignInDialog> createState() => _StudentSignInDialogState();
@@ -224,7 +298,7 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
       _errorMessage = null;
     });
 
-    final error = await AuthService().signInStudent(
+    final error = await widget.authService.signInStudent(
       _emailController.text,
       _passwordController.text,
     );

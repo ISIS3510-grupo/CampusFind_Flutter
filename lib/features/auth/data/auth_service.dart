@@ -2,43 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthService {
+  const AuthService();
+
+  bool get hasCurrentUser => FirebaseAuth.instance.currentUser != null;
+
   // Returns an error message on failure, or null for a verified student.
   Future<String?> signInStudent(String email, String password) async {
     try {
       // Signs the student in with Firebase
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
-      var isStudent = false;
-      try {
-        final user = credential.user;
-        if (user == null) {
-          return 'Unable to sign in. Please try again.';
-        }
-
-        // Checks that the authenticated user has the student role
-        final profile = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get(const GetOptions(source: Source.server));
-
-        if (!profile.exists) {
-          return 'Your user profile could not be found. Please contact support.';
-        }
-        if (profile.data()?['role'] != 'student') {
-          return 'This account does not have student access.';
-        }
-
-        isStudent = true;
-        return null;
-      } finally {
-        // Clears the session if the role check fails or cannot be completed.
-        if (!isStudent) {
-          await signOut();
-        }
-      }
+      return await verifyStudentRole();
     } on FirebaseAuthException catch (error) {
       switch (error.code) {
         case 'invalid-email':
@@ -61,6 +38,31 @@ class AuthService {
     } catch (_) {
       return 'Unable to sign in. Please try again.';
     }
+  }
+
+  // Both password login and biometric unlock use this student role check.
+  Future<String?> verifyStudentRole() async {
+    String? error;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return 'Please sign in again.';
+
+      final profile = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get(const GetOptions(source: Source.server));
+
+      if (!profile.exists) {
+        error = 'Your user profile could not be found. Please contact support.';
+      } else if (profile.data()?['role'] != 'student') {
+        error = 'This account does not have student access.';
+      }
+    } catch (_) {
+      error = 'Unable to verify your student account. Please try again.';
+    }
+
+    // Failed verification denies access without signing out the saved session.
+    return error;
   }
 
   Future<void> signOut() async {

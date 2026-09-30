@@ -1,7 +1,47 @@
 import 'package:flutter/material.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+import '../../auth/data/auth_service.dart';
+import '../../auth/presentation/login_screen.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key, this.authService = const AuthService()});
+
+  final AuthService authService;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _signingOut = false;
+
+  Future<void> _signOut() async {
+    if (_signingOut) return;
+    setState(() => _signingOut = true);
+
+    try {
+      await widget.authService.signOut();
+      if (!mounted) return;
+
+      // Removes Home so the back button cannot reopen the signed-out session.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (context) => LoginScreen(authService: widget.authService),
+        ),
+        (route) => false,
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to sign out. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,8 +101,8 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      onPressed: () {},
-                      tooltip: 'Back',
+                      onPressed: _signingOut ? null : _signOut,
+                      tooltip: 'Sign out',
                       constraints: const BoxConstraints.tightFor(
                         width: 44,
                         height: 44,
