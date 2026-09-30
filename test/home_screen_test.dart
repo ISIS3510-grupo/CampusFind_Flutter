@@ -7,6 +7,7 @@ import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
 import 'package:campusfind_flutter/features/matching/data/matching_config_repository.dart';
+import 'package:campusfind_flutter/features/matching/presentation/match_alert_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -64,6 +65,9 @@ void main() {
       expect(find.byIcon(Icons.image), findsOneWidget);
       expect(find.text('Possible match'), findsNothing);
       expect(find.text('Scientific calculator'), findsNothing);
+      await tester.tap(find.text('My missing Casio'));
+      await tester.pumpAndSettle();
+      expect(find.byType(MatchAlertScreen), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -95,6 +99,64 @@ void main() {
     expect(database.documentReads, ['appConfig/general']);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'the badge passes the stored best match and every back action preserves the session',
+    (tester) async {
+      final database = FakeFirestore(
+        documents: {
+          'lostReports/report': lostReportData(),
+          'foundItems/weaker': foundItemData(),
+          'foundItems/best': {
+            ...foundItemData(),
+            'publicDescription': 'Black Casio scientific calculator',
+          },
+        },
+      );
+      final auth = _HomeAuth('student-1');
+      await _pumpHome(tester, database, auth: auth);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Possible match'));
+      await tester.pumpAndSettle();
+
+      final firstScreen = tester.widget<MatchAlertScreen>(
+        find.byType(MatchAlertScreen),
+      );
+      expect(firstScreen.lostReport.id, 'report');
+      expect(firstScreen.matchResult.foundItem.id, 'best');
+      expect(firstScreen.matchResult.score, 1.0);
+
+      for (final action in ['Back', 'Not mine', 'system back']) {
+        final screen = tester.widget<MatchAlertScreen>(
+          find.byType(MatchAlertScreen),
+        );
+        expect(screen.lostReport, same(firstScreen.lostReport));
+        expect(screen.matchResult, same(firstScreen.matchResult));
+
+        if (action == 'Back') {
+          await tester.tap(find.byTooltip('Back'));
+        } else if (action == 'Not mine') {
+          await tester.tap(find.text('Not mine'));
+        } else {
+          await tester.binding.handlePopRoute();
+        }
+        await tester.pumpAndSettle();
+        expect(find.byType(HomeScreen), findsOneWidget);
+        expect(find.byType(LoginScreen), findsNothing);
+        expect(find.text('Possible match'), findsOneWidget);
+        expect(auth.signOutCalls, 0);
+        expect(auth.currentUserId, 'student-1');
+        expect(database.queries, hasLength(2));
+        expect(database.documentReads, ['appConfig/general']);
+        expect(database.documents['lostReports/report']!['status'], 'reported');
+        if (action != 'system back') {
+          await tester.tap(find.text('Possible match'));
+          await tester.pumpAndSettle();
+        }
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('a loaded threshold of 1 excludes a near-identical candidate', (
     tester,
@@ -336,6 +398,7 @@ class _HomeAuth extends AuthService {
   _HomeAuth(this.userId);
 
   String? userId;
+  int signOutCalls = 0;
 
   @override
   String? get currentUserId => userId;
@@ -344,5 +407,8 @@ class _HomeAuth extends AuthService {
   bool get hasCurrentUser => userId != null;
 
   @override
-  Future<void> signOut() async => userId = null;
+  Future<void> signOut() async {
+    signOutCalls++;
+    userId = null;
+  }
 }

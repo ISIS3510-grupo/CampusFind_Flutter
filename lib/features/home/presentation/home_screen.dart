@@ -8,6 +8,7 @@ import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../../matching/data/matching_config_repository.dart';
 import '../../matching/domain/match_result.dart';
+import '../../matching/presentation/match_alert_screen.dart';
 import '../../matching/services/basic_matching_strategy.dart';
 import '../../matching/services/matching_service.dart';
 
@@ -81,6 +82,19 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
+  }
+
+  void _openMatchAlert() {
+    final report = _activeReport;
+    final match = _bestMatch;
+    if (report == null || match == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            MatchAlertScreen(lostReport: report, matchResult: match),
+      ),
+    );
   }
 
   Future<void> _signOut() async {
@@ -476,21 +490,31 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     if (_bestMatch != null) ...[
                       const SizedBox(height: 16),
-                      Container(
-                        width: 120,
-                        height: 28,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
+                      Semantics(
+                        button: true,
+                        child: Material(
                           color: const Color(0xFFFEFD05),
-                          border: Border.all(color: const Color(0xFFE2DEDE)),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          'Possible match',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            side: const BorderSide(color: Color(0xFFE2DEDE)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: InkWell(
+                            onTap: _openMatchAlert,
+                            borderRadius: BorderRadius.circular(10),
+                            child: const SizedBox(
+                              width: 120,
+                              height: 28,
+                              child: Center(
+                                child: Text(
+                                  'Possible match',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
