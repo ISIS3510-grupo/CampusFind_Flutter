@@ -6,6 +6,7 @@ import 'package:campusfind_flutter/core/theme/app_theme.dart';
 import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
+import 'package:campusfind_flutter/features/home/viewmodel/home_view_model.dart';
 import 'package:campusfind_flutter/features/matching/data/matching_config_repository.dart';
 import 'package:campusfind_flutter/features/matching/presentation/match_alert_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -381,15 +382,17 @@ Future<void> _pumpHome(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  final viewModel = HomeViewModel(
+    authService: auth ?? _HomeAuth('student-1'),
+    lostReportRepository: LostReportRepository(firestore: database),
+    foundItemRepository: FoundItemRepository(firestore: database),
+    matchingConfigRepository: MatchingConfigRepository(firestore: database),
+  );
+  addTearDown(viewModel.dispose);
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.lightTheme,
-      home: HomeScreen(
-        authService: auth ?? _HomeAuth('student-1'),
-        lostReportRepository: LostReportRepository(firestore: database),
-        foundItemRepository: FoundItemRepository(firestore: database),
-        matchingConfigRepository: MatchingConfigRepository(firestore: database),
-      ),
+      home: HomeScreen(viewModel: viewModel),
     ),
   );
 }

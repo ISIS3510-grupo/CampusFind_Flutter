@@ -7,10 +7,9 @@ import '../../../core/utils/report_age.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../../matching/data/matching_config_repository.dart';
-import '../../matching/domain/match_result.dart';
 import '../../matching/presentation/match_alert_screen.dart';
-import '../../matching/services/basic_matching_strategy.dart';
 import '../../matching/services/matching_service.dart';
+import '../viewmodel/home_view_model.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -19,74 +18,51 @@ class HomeScreen extends StatefulWidget {
     this.lostReportRepository = const LostReportRepository(),
     this.foundItemRepository = const FoundItemRepository(),
     this.matchingConfigRepository = const MatchingConfigRepository(),
+    this.createMatchingService,
+    this.viewModel,
   });
 
   final AuthService authService;
   final LostReportRepository lostReportRepository;
   final FoundItemRepository foundItemRepository;
   final MatchingConfigRepository matchingConfigRepository;
+  final MatchingService Function(double threshold)? createMatchingService;
+  // Injected ViewModels remain owned by the caller.
+  final HomeViewModel? viewModel;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _signingOut = false;
-  bool _loadingReport = true;
-  LostReport? _activeReport;
-  MatchResult? _bestMatch;
-  String? _reportError;
+  late final HomeViewModel _viewModel;
+  late final bool _ownsViewModel;
 
   @override
   void initState() {
     super.initState();
-    _loadActiveReport();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel =
+        widget.viewModel ??
+        HomeViewModel(
+          authService: widget.authService,
+          lostReportRepository: widget.lostReportRepository,
+          foundItemRepository: widget.foundItemRepository,
+          matchingConfigRepository: widget.matchingConfigRepository,
+          createMatchingService: widget.createMatchingService,
+        );
+    _viewModel.loadHome();
   }
 
-  Future<void> _loadActiveReport() async {
-    String? userId;
-    LostReport? report;
-    MatchResult? bestMatch;
-    String? error;
-    try {
-      userId = widget.authService.currentUserId;
-      if (userId == null || userId.isEmpty) return;
-
-      report = await widget.lostReportRepository.getActiveReport(userId);
-      if (!mounted || widget.authService.currentUserId != userId) return;
-      if (report == null) return;
-
-      final foundItems = await widget.foundItemRepository.getAvailableItems();
-      if (!mounted || widget.authService.currentUserId != userId) return;
-      final threshold = await widget.matchingConfigRepository
-          .getMatchingThreshold();
-      final service = MatchingService(
-        strategy: const BasicMatchingStrategy(),
-        threshold: threshold,
-      );
-      final results = service.findPossibleMatches(report, foundItems);
-      bestMatch = results.isEmpty ? null : results.first;
-    } catch (_) {
-      error = report == null
-          ? 'Unable to load your active report.'
-          : 'Unable to check possible matches.';
-    } finally {
-      if (mounted) {
-        final sameUser =
-            userId != null && widget.authService.currentUserId == userId;
-        setState(() {
-          _loadingReport = false;
-          _activeReport = sameUser ? report : null;
-          _bestMatch = sameUser ? bestMatch : null;
-          _reportError = error;
-        });
-      }
-    }
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
   }
 
   void _openMatchAlert() {
-    final report = _activeReport;
-    final match = _bestMatch;
+    final report = _viewModel.activeReport;
+    final match = _viewModel.bestMatch;
     if (report == null || match == null) return;
 
     Navigator.of(context).push(
@@ -98,43 +74,45 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _signOut() async {
-    if (_signingOut) return;
-    setState(() => _signingOut = true);
-
-    try {
-      await widget.authService.signOut();
-      if (!mounted) return;
-
+    final signedOut = await _viewModel.signOut();
+    if (!mounted) return;
+    if (signedOut) {
+      final authService = _viewModel.authService;
+      final lostReportRepository = _viewModel.lostReportRepository;
+      final foundItemRepository = _viewModel.foundItemRepository;
+      final matchingConfigRepository = _viewModel.matchingConfigRepository;
+      final createMatchingService = _viewModel.createMatchingService;
       // Removes Home so the back button cannot reopen the signed-out session.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
           builder: (context) => LoginScreen(
-            authService: widget.authService,
+            authService: authService,
             homeBuilder: (context) => HomeScreen(
-              authService: widget.authService,
-              lostReportRepository: widget.lostReportRepository,
-              foundItemRepository: widget.foundItemRepository,
-              matchingConfigRepository: widget.matchingConfigRepository,
+              authService: authService,
+              lostReportRepository: lostReportRepository,
+              foundItemRepository: foundItemRepository,
+              matchingConfigRepository: matchingConfigRepository,
+              createMatchingService: createMatchingService,
             ),
           ),
         ),
         (route) => false,
       );
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to sign out. Please try again.'),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _signingOut = false);
+    } else if (_viewModel.signOutError != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(_viewModel.signOutError!)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) => _buildHome(context),
+    );
+  }
+
+  Widget _buildHome(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -191,7 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     IconButton(
-                      onPressed: _signingOut ? null : _signOut,
+                      onPressed: _viewModel.isSigningOut ? null : _signOut,
                       tooltip: 'Sign out',
                       constraints: const BoxConstraints.tightFor(
                         width: 44,
@@ -335,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    if (_loadingReport)
+                    if (_viewModel.isLoading)
                       const Padding(
                         padding: EdgeInsets.only(top: 36),
                         child: Center(
@@ -349,13 +327,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                    if (_activeReport != null)
-                      _buildActiveReportSection(_activeReport!),
-                    if (_reportError != null)
+                    if (_viewModel.activeReport != null)
+                      _buildActiveReportSection(_viewModel.activeReport!),
+                    if (_viewModel.errorMessage != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 16),
                         child: Text(
-                          _reportError!,
+                          _viewModel.errorMessage!,
                           style: const TextStyle(
                             fontSize: 13,
                             color: Color(0xFF999798),
@@ -488,7 +466,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         height: 1.2,
                       ),
                     ),
-                    if (_bestMatch != null) ...[
+                    if (_viewModel.bestMatch != null) ...[
                       const SizedBox(height: 16),
                       Semantics(
                         button: true,

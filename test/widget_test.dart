@@ -3,14 +3,15 @@ import 'dart:async';
 import 'package:campusfind_flutter/app/campus_find_app.dart';
 import 'package:campusfind_flutter/core/data/lost_report_repository.dart';
 import 'package:campusfind_flutter/core/theme/app_theme.dart';
-import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
-import 'package:campusfind_flutter/features/auth/data/biometric_service.dart';
+import 'package:campusfind_flutter/features/auth/viewmodel/auth_view_model.dart';
+
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/auth_fakes.dart';
 import 'support/firestore_fakes.dart';
 import 'support/test_fonts.dart';
 
@@ -31,8 +32,8 @@ void main() {
     expect(find.text('Enter with Uniandes'), findsOneWidget);
     expect(find.text('Staff access'), findsOneWidget);
 
-    final auth = _FakeAuthService();
-    final biometrics = _FakeBiometricService();
+    final auth = FakeAuthService();
+    final biometrics = FakeBiometricService();
     await _pumpLogin(tester, auth, biometrics);
     await tester.tap(find.text('Enter with Uniandes'));
     await tester.pumpAndSettle();
@@ -86,7 +87,7 @@ void main() {
       MaterialApp(
         theme: AppTheme.lightTheme,
         home: HomeScreen(
-          authService: _FakeAuthService(savedSession: true),
+          authService: FakeAuthService(savedSession: true),
           lostReportRepository: LostReportRepository(
             firestore: FakeFirestore(),
           ),
@@ -135,8 +136,8 @@ void main() {
   testWidgets('Saved student session opens Home after biometric success', (
     tester,
   ) async {
-    final auth = _FakeAuthService(savedSession: true);
-    final biometrics = _FakeBiometricService();
+    final auth = FakeAuthService(savedSession: true);
+    final biometrics = FakeBiometricService();
     await _pumpLogin(tester, auth, biometrics);
 
     await tester.tap(find.text('Enter with Uniandes'));
@@ -152,8 +153,8 @@ void main() {
   testWidgets(
     'Biometric false opens password login without role checks or navigation',
     (tester) async {
-      final auth = _FakeAuthService(savedSession: true);
-      final biometrics = _FakeBiometricService(authenticated: false);
+      final auth = FakeAuthService(savedSession: true);
+      final biometrics = FakeBiometricService(authenticated: false);
       await _pumpLogin(tester, auth, biometrics);
 
       await tester.tap(find.text('Enter with Uniandes'));
@@ -184,8 +185,8 @@ void main() {
   testWidgets('Unavailable biometrics fall back to the password dialog', (
     tester,
   ) async {
-    final auth = _FakeAuthService(savedSession: true);
-    final biometrics = _FakeBiometricService(available: false);
+    final auth = FakeAuthService(savedSession: true);
+    final biometrics = FakeBiometricService(available: false);
     await _pumpLogin(tester, auth, biometrics);
 
     await tester.tap(find.text('Enter with Uniandes'));
@@ -203,11 +204,11 @@ void main() {
   testWidgets('Biometric success cannot bypass a rejected student role', (
     tester,
   ) async {
-    final auth = _FakeAuthService(
+    final auth = FakeAuthService(
       savedSession: true,
       roleError: 'This account does not have student access.',
     );
-    await _pumpLogin(tester, auth, _FakeBiometricService());
+    await _pumpLogin(tester, auth, FakeBiometricService());
 
     await tester.tap(find.text('Enter with Uniandes'));
     await tester.pumpAndSettle();
@@ -227,8 +228,8 @@ void main() {
     tester,
   ) async {
     final result = Completer<bool>();
-    final auth = _FakeAuthService(savedSession: true);
-    final biometrics = _FakeBiometricService(pendingResult: result);
+    final auth = FakeAuthService(savedSession: true);
+    final biometrics = FakeBiometricService(pendingResult: result);
     await _pumpLogin(tester, auth, biometrics);
 
     await tester.tap(find.text('Enter with Uniandes'));
@@ -249,8 +250,8 @@ void main() {
   testWidgets(
     'Biometric exception opens password login and keeps the session',
     (tester) async {
-      final auth = _FakeAuthService(savedSession: true);
-      final biometrics = _FakeBiometricService(
+      final auth = FakeAuthService(savedSession: true);
+      final biometrics = FakeBiometricService(
         authenticationError: PlatformException(
           code: 'authentication_cancelled',
         ),
@@ -279,14 +280,14 @@ void main() {
   testWidgets(
     'Rejected fallback password cannot use the saved session to enter Home',
     (tester) async {
-      final auth = _FakeAuthService(
+      final auth = FakeAuthService(
         savedSession: true,
         passwordError: 'Incorrect email or password. Please try again.',
       );
       await _pumpLogin(
         tester,
         auth,
-        _FakeBiometricService(authenticated: false),
+        FakeBiometricService(authenticated: false),
       );
 
       await tester.tap(find.text('Enter with Uniandes'));
@@ -313,8 +314,8 @@ void main() {
   testWidgets(
     'Home arrow signs out, clears the stack, and restores password login',
     (tester) async {
-      final auth = _FakeAuthService(savedSession: true);
-      final biometrics = _FakeBiometricService();
+      final auth = FakeAuthService(savedSession: true);
+      final biometrics = FakeBiometricService();
       await _pumpLogin(tester, auth, biometrics);
       await tester.tap(find.text('Enter with Uniandes'));
       await tester.pumpAndSettle();
@@ -345,8 +346,8 @@ void main() {
   testWidgets('Failed sign-out keeps Home open and reports the error', (
     tester,
   ) async {
-    final auth = _FakeAuthService(savedSession: true, failSignOut: true);
-    await _pumpLogin(tester, auth, _FakeBiometricService());
+    final auth = FakeAuthService(savedSession: true, failSignOut: true);
+    await _pumpLogin(tester, auth, FakeBiometricService());
     await tester.tap(find.text('Enter with Uniandes'));
     await tester.pumpAndSettle();
 
@@ -361,19 +362,23 @@ void main() {
 
 Future<void> _pumpLogin(
   WidgetTester tester,
-  _FakeAuthService auth,
-  _FakeBiometricService biometrics,
+  FakeAuthService auth,
+  FakeBiometricService biometrics,
 ) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  final viewModel = AuthViewModel(
+    authService: auth,
+    biometricService: biometrics,
+  );
+  addTearDown(viewModel.dispose);
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.lightTheme,
       home: LoginScreen(
-        authService: auth,
-        biometricService: biometrics,
+        viewModel: viewModel,
         homeBuilder: (context) => HomeScreen(
           authService: auth,
           lostReportRepository: LostReportRepository(
@@ -383,78 +388,4 @@ Future<void> _pumpLogin(
       ),
     ),
   );
-}
-
-// These services keep the widget tests independent of Firebase and the sensor.
-class _FakeAuthService extends AuthService {
-  _FakeAuthService({
-    this.savedSession = false,
-    this.roleError,
-    this.passwordError,
-    this.failSignOut = false,
-  });
-
-  bool savedSession;
-  final String? roleError;
-  final String? passwordError;
-  final bool failSignOut;
-  int roleChecks = 0;
-  int passwordCalls = 0;
-  int signOutCalls = 0;
-
-  @override
-  bool get hasCurrentUser => savedSession;
-
-  @override
-  String? get currentUserId => savedSession ? 'student-1' : null;
-
-  @override
-  Future<String?> verifyStudentRole() async {
-    roleChecks++;
-    return roleError;
-  }
-
-  @override
-  Future<String?> signInStudent(String email, String password) async {
-    passwordCalls++;
-    if (passwordError != null) return passwordError;
-    savedSession = true;
-    return verifyStudentRole();
-  }
-
-  @override
-  Future<void> signOut() async {
-    signOutCalls++;
-    if (failSignOut) throw StateError('Sign-out failed');
-    savedSession = false;
-  }
-}
-
-class _FakeBiometricService extends BiometricService {
-  _FakeBiometricService({
-    this.available = true,
-    this.authenticated = true,
-    this.pendingResult,
-    this.authenticationError,
-  });
-
-  final bool available;
-  final bool authenticated;
-  final Completer<bool>? pendingResult;
-  final Object? authenticationError;
-  int availabilityChecks = 0;
-  int authenticationCalls = 0;
-
-  @override
-  Future<bool> canAuthenticate() async {
-    availabilityChecks++;
-    return available;
-  }
-
-  @override
-  Future<bool> authenticate() async {
-    authenticationCalls++;
-    if (authenticationError != null) throw authenticationError!;
-    return pendingResult?.future ?? Future.value(authenticated);
-  }
 }

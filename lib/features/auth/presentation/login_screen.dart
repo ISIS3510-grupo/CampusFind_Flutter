@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../home/presentation/home_screen.dart';
 import '../data/auth_service.dart';
 import '../data/biometric_service.dart';
+import '../viewmodel/auth_view_model.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -10,92 +11,92 @@ class LoginScreen extends StatefulWidget {
     this.authService = const AuthService(),
     this.biometricService,
     this.homeBuilder,
+    this.viewModel,
   });
 
   final AuthService authService;
   final BiometricService? biometricService;
   final WidgetBuilder? homeBuilder;
+  // Injected ViewModels remain owned by the caller.
+  final AuthViewModel? viewModel;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  late final _biometricService = widget.biometricService ?? BiometricService();
-  bool _checkingAccess = false;
+  late final AuthViewModel _viewModel;
+  late final bool _ownsViewModel;
+  bool _showingSignInDialog = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel =
+        widget.viewModel ??
+        AuthViewModel(
+          authService: widget.authService,
+          biometricService: widget.biometricService,
+        );
+  }
+
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleStudentAccess() async {
-    if (_checkingAccess) return;
-    setState(() => _checkingAccess = true);
-
-    try {
-      if (!widget.authService.hasCurrentUser) {
-        await _showSignInDialog();
-        return;
-      }
-
-      final available = await _biometricService.canAuthenticate();
-      if (!mounted) return;
-      if (!available) {
-        await _showSignInDialog();
-        return;
-      }
-
-      final authenticated = await _biometricService.authenticate();
-      if (!mounted) return;
-      if (authenticated != true) {
-        // A failed or cancelled prompt cannot continue to the role check.
-        await _showSignInDialog();
-        return;
-      }
-      if (!widget.authService.hasCurrentUser) {
-        await _showSignInDialog();
-        return;
-      }
-
-      // Existing Firebase session is still validated as a student.
-      final error = await widget.authService.verifyStudentRole();
-      if (!mounted) return;
-      if (error == null) {
-        _openHome();
-      } else {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error)));
-      }
-    } catch (_) {
-      if (mounted) await _showSignInDialog();
-    } finally {
-      if (mounted) setState(() => _checkingAccess = false);
+    if (_viewModel.isBusy || _showingSignInDialog) return;
+    await _viewModel.requestStudentAccess();
+    if (!mounted) return;
+    if (_viewModel.needsPasswordSignIn) {
+      await _showSignInDialog();
+    } else if (_viewModel.isAuthenticated) {
+      _openHome();
+    } else if (_viewModel.errorMessage != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(_viewModel.errorMessage!)));
     }
   }
 
   Future<void> _showSignInDialog() async {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    final signedIn = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) =>
-          _StudentSignInDialog(authService: widget.authService),
-    );
-
-    if (signedIn == true && mounted) {
-      _openHome();
+    setState(() => _showingSignInDialog = true);
+    try {
+      final signedIn = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _StudentSignInDialog(viewModel: _viewModel),
+      );
+      if (signedIn == true && mounted) _openHome();
+    } finally {
+      if (mounted) setState(() => _showingSignInDialog = false);
     }
   }
 
   void _openHome() {
+    final authService = _viewModel.authService;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder:
             widget.homeBuilder ??
-            (context) => HomeScreen(authService: widget.authService),
+            (context) => HomeScreen(authService: authService),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) => _buildLogin(context),
+    );
+  }
+
+  Widget _buildLogin(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -198,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: _checkingAccess
+                        onPressed: _viewModel.isBusy || _showingSignInDialog
                             ? null
                             : _handleStudentAccess,
                         style: ElevatedButton.styleFrom(
@@ -267,9 +268,9 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 class _StudentSignInDialog extends StatefulWidget {
-  const _StudentSignInDialog({required this.authService});
+  const _StudentSignInDialog({required this.viewModel});
 
-  final AuthService authService;
+  final AuthViewModel viewModel;
 
   @override
   State<_StudentSignInDialog> createState() => _StudentSignInDialogState();
@@ -278,8 +279,7 @@ class _StudentSignInDialog extends StatefulWidget {
 class _StudentSignInDialogState extends State<_StudentSignInDialog> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isSigningIn = false;
-  String? _errorMessage;
+  String? _validationMessage;
 
   @override
   void dispose() {
@@ -289,39 +289,42 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
   }
 
   Future<void> _signIn() async {
-    if (_isSigningIn) return;
+    if (widget.viewModel.isBusy) return;
 
     if (_emailController.text.trim().isEmpty ||
         _passwordController.text.isEmpty) {
-      setState(() => _errorMessage = 'Please enter your email and password.');
+      setState(
+        () => _validationMessage = 'Please enter your email and password.',
+      );
       return;
     }
 
-    setState(() {
-      _isSigningIn = true;
-      _errorMessage = null;
-    });
+    setState(() => _validationMessage = null);
 
-    final error = await widget.authService.signInStudent(
+    final signedIn = await widget.viewModel.signInStudent(
       _emailController.text,
       _passwordController.text,
     );
     if (!mounted) return;
 
-    if (error == null) {
+    if (signedIn) {
       Navigator.of(context).pop(true);
-    } else {
-      setState(() {
-        _isSigningIn = false;
-        _errorMessage = error;
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.viewModel,
+      builder: (context, child) => _buildDialog(context),
+    );
+  }
+
+  Widget _buildDialog(BuildContext context) {
+    final isSigningIn = widget.viewModel.isBusy;
+    final errorMessage = _validationMessage ?? widget.viewModel.errorMessage;
     return PopScope(
-      canPop: !_isSigningIn,
+      canPop: !isSigningIn,
       child: AlertDialog(
         title: const Text('Student sign in'),
         content: SingleChildScrollView(
@@ -330,7 +333,7 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
             children: [
               TextField(
                 controller: _emailController,
-                enabled: !_isSigningIn,
+                enabled: !isSigningIn,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 autocorrect: false,
@@ -339,7 +342,7 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
-                enabled: !_isSigningIn,
+                enabled: !isSigningIn,
                 obscureText: true,
                 autocorrect: false,
                 enableSuggestions: false,
@@ -347,10 +350,10 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
                 onSubmitted: (_) => _signIn(),
                 decoration: const InputDecoration(labelText: 'Password'),
               ),
-              if (_errorMessage != null) ...[
+              if (errorMessage != null) ...[
                 const SizedBox(height: 16),
                 Text(
-                  _errorMessage!,
+                  errorMessage,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ],
@@ -359,12 +362,12 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
         ),
         actions: [
           TextButton(
-            onPressed: _isSigningIn ? null : () => Navigator.of(context).pop(),
+            onPressed: isSigningIn ? null : () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: _isSigningIn ? null : _signIn,
-            child: _isSigningIn
+            onPressed: isSigningIn ? null : _signIn,
+            child: isSigningIn
                 ? const SizedBox(
                     width: 20,
                     height: 20,
