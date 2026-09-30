@@ -1,0 +1,51 @@
+name: Feature
+description: A functionality, view, BQ or design pattern to implement in the app
+title: "[Feature] "
+labels: ["type: feature"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: Sprint category
+      description: Which Sprint requirement does this cover?
+      options:
+        - Sensor
+        - Type 2 Business Question
+        - Context-aware
+        - Smart feature
+        - Authentication
+        - External service
+        - View (GUI)
+        - Design pattern / tactic
+        - Analytics pipeline
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What should the feature do, from the user's point of view?
+      placeholder: "As an admin, I want ... so that ..."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Concrete, testable conditions. The issue is done when all of them hold.
+      value: |
+        - [ ] 
+        - [ ] 
+    validations:
+      required: true
+  - type: textarea
+    id: technical
+    attributes:
+      label: Technical notes
+      description: Screens, ViewModels, Firestore collections, packages, patterns involved.
+  - type: input
+    id: related
+    attributes:
+      label: Related BQ / scenario
+      description: BQ or functional/quality scenario from the wiki this comes from (if any).

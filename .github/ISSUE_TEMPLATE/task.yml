@@ -1,0 +1,19 @@
+name: Task
+description: Setup, refactor, documentation or any work that is not a feature or a bug
+title: "[Task] "
+labels: ["type: chore"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs to be done?
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      value: |
+        - [ ] 
+    validations:
+      required: true
