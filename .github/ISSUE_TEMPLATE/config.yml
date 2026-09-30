@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Project wiki
+    url: https://github.com/ISIS3510-grupo/Proyecto/wiki
+    about: Business questions, scenarios, architecture and sprint deliverables.
