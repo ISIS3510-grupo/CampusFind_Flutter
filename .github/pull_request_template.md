@@ -33,7 +33,8 @@ Closes #
 
 ## Checklist
 
-- [ ] The branch is up to date with `main`
+- [ ] The PR targets `dev` (only `dev` may target `main`)
+- [ ] The branch is up to date with `dev`
 - [ ] CI is green
 - [ ] No secrets, API keys or tokens are committed
 - [ ] Commit messages follow Conventional Commits

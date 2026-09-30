@@ -4,14 +4,25 @@ This guide describes how the team works in this repository. Following it is part
 
 ## 1. Workflow
 
+```
+feat/12-admin-login ──PR (squash)──▶ dev ──PR (merge commit)──▶ main
+```
+
+| Branch | Purpose | How changes get in |
+|---|---|---|
+| `main` | Stable version that is graded and demoed | Only through a PR **from `dev`**, merge commit |
+| `dev` | Integration branch (default branch) | Only through a PR from a work branch, squash merge |
+| `feat/…`, `fix/…`, etc. | One branch per issue | Direct pushes |
+
 1. **Pick or create an issue.** Every change starts from an issue created with one of the templates. Assign yourself, add it to the current milestone (e.g. `Sprint 2`) and to the project board.
-2. **Create a branch from `main`** using the naming convention below.
+2. **Create a branch from `dev`** using the naming convention below.
 3. **Commit often** with Conventional Commits.
-4. **Open a pull request** into `main` using the template. Link the issue with `Closes #<number>`.
+4. **Open a pull request into `dev`** using the template. Link the issue with `Closes #<number>`.
 5. **Get one approval** from a teammate and make sure CI is green.
 6. **Squash and merge.** The branch is deleted automatically.
+7. **Release to `main`:** when `dev` is stable (at least before each deadline), someone opens a PR `dev → main`, it gets one approval and is merged with a merge commit.
 
-`main` is protected: nobody (not even admins) can push to it directly, force-push it or delete it. All changes go through a pull request.
+Both `main` and `dev` are protected: nobody (not even admins) can push to them directly, force-push them or delete them. A PR into `main` from any branch other than `dev` fails the "Source branch is dev" check and cannot be merged.
 
 ## 2. Branch names
 
@@ -54,7 +65,9 @@ Write verbose commits: the message should explain the change without opening the
 - Fill in every section of the template, including how you tested it.
 - Add screenshots when the UI changes.
 - Resolve all review conversations before merging.
-- Only **squash merge** is enabled, so the PR title becomes the commit on `main`: write it as a Conventional Commit.
+- Keep your branch updated with `dev` (use the "Update branch" button or `git merge origin/dev`).
+- PRs into `dev` use **squash merge**, so the PR title becomes the commit on `dev`: write it as a Conventional Commit.
+- PRs `dev → main` use a **merge commit**, so `dev` and `main` keep a shared history.
 
 ## 5. Reviews
 
