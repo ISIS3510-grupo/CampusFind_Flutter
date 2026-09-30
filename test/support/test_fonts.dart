@@ -15,8 +15,8 @@ Future<void> loadTestFonts() async {
     '${flutterPackage['rootUri']}/',
   );
   for (final font in {
-    'Roboto': 'roboto-regular.ttf',
-    'MaterialIcons': 'materialicons-regular.otf',
+    'Roboto': 'Roboto-Regular.ttf',
+    'MaterialIcons': 'MaterialIcons-Regular.otf',
   }.entries) {
     final fontFile = File.fromUri(
       flutterRoot.resolve(
