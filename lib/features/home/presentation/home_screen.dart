@@ -1,12 +1,29 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/data/found_item_repository.dart';
+import '../../../core/data/lost_report_repository.dart';
+import '../../../core/models/lost_report.dart';
+import '../../../core/utils/report_age.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
+import '../../matching/data/matching_config_repository.dart';
+import '../../matching/domain/match_result.dart';
+import '../../matching/services/basic_matching_strategy.dart';
+import '../../matching/services/matching_service.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.authService = const AuthService()});
+  const HomeScreen({
+    super.key,
+    this.authService = const AuthService(),
+    this.lostReportRepository = const LostReportRepository(),
+    this.foundItemRepository = const FoundItemRepository(),
+    this.matchingConfigRepository = const MatchingConfigRepository(),
+  });
 
   final AuthService authService;
+  final LostReportRepository lostReportRepository;
+  final FoundItemRepository foundItemRepository;
+  final MatchingConfigRepository matchingConfigRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -14,6 +31,57 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _signingOut = false;
+  bool _loadingReport = true;
+  LostReport? _activeReport;
+  MatchResult? _bestMatch;
+  String? _reportError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActiveReport();
+  }
+
+  Future<void> _loadActiveReport() async {
+    String? userId;
+    LostReport? report;
+    MatchResult? bestMatch;
+    String? error;
+    try {
+      userId = widget.authService.currentUserId;
+      if (userId == null || userId.isEmpty) return;
+
+      report = await widget.lostReportRepository.getActiveReport(userId);
+      if (!mounted || widget.authService.currentUserId != userId) return;
+      if (report == null) return;
+
+      final foundItems = await widget.foundItemRepository.getAvailableItems();
+      if (!mounted || widget.authService.currentUserId != userId) return;
+      final threshold = await widget.matchingConfigRepository
+          .getMatchingThreshold();
+      final service = MatchingService(
+        strategy: const BasicMatchingStrategy(),
+        threshold: threshold,
+      );
+      final results = service.findPossibleMatches(report, foundItems);
+      bestMatch = results.isEmpty ? null : results.first;
+    } catch (_) {
+      error = report == null
+          ? 'Unable to load your active report.'
+          : 'Unable to check possible matches.';
+    } finally {
+      if (mounted) {
+        final sameUser =
+            userId != null && widget.authService.currentUserId == userId;
+        setState(() {
+          _loadingReport = false;
+          _activeReport = sameUser ? report : null;
+          _bestMatch = sameUser ? bestMatch : null;
+          _reportError = error;
+        });
+      }
+    }
+  }
 
   Future<void> _signOut() async {
     if (_signingOut) return;
@@ -26,7 +94,15 @@ class _HomeScreenState extends State<HomeScreen> {
       // Removes Home so the back button cannot reopen the signed-out session.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
-          builder: (context) => LoginScreen(authService: widget.authService),
+          builder: (context) => LoginScreen(
+            authService: widget.authService,
+            homeBuilder: (context) => HomeScreen(
+              authService: widget.authService,
+              lostReportRepository: widget.lostReportRepository,
+              foundItemRepository: widget.foundItemRepository,
+              matchingConfigRepository: widget.matchingConfigRepository,
+            ),
+          ),
         ),
         (route) => false,
       );
@@ -245,92 +321,33 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 36),
-                    const Text(
-                      'My active report',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 13),
-                    // Temporary UI data; the report team will connect this later.
-                    Container(
-                      height: 116,
-                      padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFE2DEDE)),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 92,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE2DEDE),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.image,
-                              size: 26,
-                              color: Color(0xFF999798),
+                    if (_loadingReport)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 36),
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              semanticsLabel: 'Loading active report',
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Scientific calculator',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black,
-                                    height: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 9),
-                                const Text(
-                                  'Lost in ML · 2 days ago',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w300,
-                                    color: Color(0xFF999798),
-                                    height: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Container(
-                                  width: 120,
-                                  height: 28,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFEFD05),
-                                    border: Border.all(
-                                      color: const Color(0xFFE2DEDE),
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Text(
-                                    'Possible match',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                    if (_activeReport != null)
+                      _buildActiveReportSection(_activeReport!),
+                    if (_reportError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Text(
+                          _reportError!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF999798),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -376,6 +393,115 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildActiveReportSection(LostReport report) {
+    final location = report.locationName.trim();
+    final age = reportAge(report.reportedAt);
+    final subtitle = location.isEmpty ? age : 'Lost in $location · $age';
+    final imageUrl = report.imageUrl?.trim();
+    const placeholder = Center(
+      child: Icon(Icons.image, size: 26, color: Color(0xFF999798)),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 36),
+        const Text(
+          'My active report',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 13),
+        Container(
+          constraints: const BoxConstraints(minHeight: 116),
+          padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFE2DEDE)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 92,
+                  height: 96,
+                  color: const Color(0xFFE2DEDE),
+                  child: imageUrl == null || imageUrl.isEmpty
+                      ? placeholder
+                      : Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              placeholder,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 6),
+                    Text(
+                      report.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w300,
+                        color: Color(0xFF999798),
+                        height: 1.2,
+                      ),
+                    ),
+                    if (_bestMatch != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: 120,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEFD05),
+                          border: Border.all(color: const Color(0xFFE2DEDE)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'Possible match',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

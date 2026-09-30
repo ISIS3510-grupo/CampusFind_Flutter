@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:campusfind_flutter/app/campus_find_app.dart';
+import 'package:campusfind_flutter/core/data/lost_report_repository.dart';
 import 'package:campusfind_flutter/core/theme/app_theme.dart';
 import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
 import 'package:campusfind_flutter/features/auth/data/biometric_service.dart';
@@ -12,34 +11,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/firestore_fakes.dart';
+import 'support/test_fonts.dart';
+
 void main() {
-  setUpAll(() async {
-    // Uses the SDK font so text has normal Android dimensions in tests.
-    final packageConfig = File('.dart_tool/package_config.json');
-    final packages =
-        jsonDecode(await packageConfig.readAsString())['packages'] as List;
-    final flutterPackage = packages.firstWhere(
-      (package) => package['name'] == 'flutter',
-    );
-    final flutterRoot = packageConfig.uri.resolve(
-      '${flutterPackage['rootUri']}/',
-    );
-    for (final font in {
-      'Roboto': 'roboto-regular.ttf',
-      'MaterialIcons': 'materialicons-regular.otf',
-    }.entries) {
-      final fontFile = File.fromUri(
-        flutterRoot.resolve(
-          '../../bin/cache/artifacts/material_fonts/${font.value}',
-        ),
-      );
-      final fontLoader = FontLoader(font.key);
-      fontLoader.addFont(
-        fontFile.readAsBytes().then((bytes) => ByteData.sublistView(bytes)),
-      );
-      await fontLoader.load();
-    }
-  });
+  setUpAll(loadTestFonts);
 
   testWidgets('Login screen displays the access options', (
     WidgetTester tester,
@@ -107,21 +83,29 @@ void main() {
     addTearDown(tester.view.resetPadding);
 
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.lightTheme, home: const HomeScreen()),
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: HomeScreen(
+          authService: _FakeAuthService(savedSession: true),
+          lostReportRepository: LostReportRepository(
+            firestore: FakeFirestore(),
+          ),
+        ),
+      ),
     );
+    await tester.pumpAndSettle();
 
     for (final text in [
       'Lost & Found',
       'What do you need?',
       'Search found items',
       'I found an item',
-      'My active report',
-      'Scientific calculator',
-      'Lost in ML · 2 days ago',
-      'Possible match',
     ]) {
       expect(find.text(text), findsOneWidget);
     }
+    expect(find.text('My active report'), findsNothing);
+    expect(find.text('Scientific calculator'), findsNothing);
+    expect(find.text('Possible match'), findsNothing);
 
     for (final text in [
       'Search found items',
@@ -144,7 +128,7 @@ void main() {
 
     tester.view.physicalSize = const Size(360, 640);
     await tester.pumpAndSettle();
-    expect(find.text('My active report'), findsOneWidget);
+    expect(find.text('My active report'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -387,7 +371,16 @@ Future<void> _pumpLogin(
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.lightTheme,
-      home: LoginScreen(authService: auth, biometricService: biometrics),
+      home: LoginScreen(
+        authService: auth,
+        biometricService: biometrics,
+        homeBuilder: (context) => HomeScreen(
+          authService: auth,
+          lostReportRepository: LostReportRepository(
+            firestore: FakeFirestore(),
+          ),
+        ),
+      ),
     ),
   );
 }
@@ -411,6 +404,9 @@ class _FakeAuthService extends AuthService {
 
   @override
   bool get hasCurrentUser => savedSession;
+
+  @override
+  String? get currentUserId => savedSession ? 'student-1' : null;
 
   @override
   Future<String?> verifyStudentRole() async {

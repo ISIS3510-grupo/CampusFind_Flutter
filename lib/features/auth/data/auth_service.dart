@@ -6,6 +6,8 @@ class AuthService {
 
   bool get hasCurrentUser => FirebaseAuth.instance.currentUser != null;
 
+  String? get currentUserId => FirebaseAuth.instance.currentUser?.uid;
+
   // Returns an error message on failure, or null for a verified student.
   Future<String?> signInStudent(String email, String password) async {
     try {

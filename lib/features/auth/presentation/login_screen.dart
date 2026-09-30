@@ -9,10 +9,12 @@ class LoginScreen extends StatefulWidget {
     super.key,
     this.authService = const AuthService(),
     this.biometricService,
+    this.homeBuilder,
   });
 
   final AuthService authService;
   final BiometricService? biometricService;
+  final WidgetBuilder? homeBuilder;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -85,7 +87,9 @@ class _LoginScreenState extends State<LoginScreen> {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (context) => HomeScreen(authService: widget.authService),
+        builder:
+            widget.homeBuilder ??
+            (context) => HomeScreen(authService: widget.authService),
       ),
     );
   }
