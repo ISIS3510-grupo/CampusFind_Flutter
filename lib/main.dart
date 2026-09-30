@@ -1,8 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 
-import 'app/campus_find_app.dart';
-import 'firebase_options.dart';
+import 'package:campusfind_flutter/app/campus_find_app.dart';
+import 'package:campusfind_flutter/firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
