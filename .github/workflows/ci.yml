@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so SonarQube Cloud can compute new code and blame
 
       - uses: subosito/flutter-action@v2
         with:
@@ -25,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Download Flutter artifacts (Material fonts used by widget tests)
+        run: flutter precache --universal --no-android --no-ios --no-web --no-linux --no-macos --no-windows --no-fuchsia
+
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test
         continue-on-error: true
@@ -32,5 +37,28 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      - name: Test
-        run: flutter test
+      - name: Test with coverage
+        run: flutter test --coverage
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ -f coverage/lcov.info ]; then
+            total=$(grep -c '^DA:' coverage/lcov.info || true)
+            hit=$(grep '^DA:' coverage/lcov.info | grep -vc ',0$' || true)
+            pct=$(awk -v h="$hit" -v t="$total" 'BEGIN { if (t > 0) printf "%.1f", 100*h/t; else print "0" }')
+            echo "### Line coverage: ${pct}% (${hit}/${total} lines)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: ignore
+
+      - name: SonarQube Cloud scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
