@@ -47,7 +47,7 @@ jobs:
             total=$(grep -c '^DA:' coverage/lcov.info || true)
             hit=$(grep '^DA:' coverage/lcov.info | grep -vc ',0$' || true)
             pct=$(awk -v h="$hit" -v t="$total" 'BEGIN { if (t > 0) printf "%.1f", 100*h/t; else print "0" }')
-            echo "### Line coverage: ${pct}% (${hit}/${total} lines)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Line coverage: ${pct}% (${hit}/${total} lines) - informative, not required" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload coverage report
