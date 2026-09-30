@@ -34,9 +34,6 @@ jobs:
         run: dart format --output=none --set-exit-if-changed lib test
         continue-on-error: true
 
-      - name: List Material fonts (debug)
-        run: ls "$FLUTTER_ROOT/bin/cache/artifacts/material_fonts" | head -20
-
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
