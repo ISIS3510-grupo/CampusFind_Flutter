@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../auth/data/auth_service.dart';
-import '../../auth/presentation/login_screen.dart';
+import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
+import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
+import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.authService = const AuthService()});
@@ -173,6 +174,69 @@ class _HomeScreenState extends State<HomeScreen> {
                                       SizedBox(height: 10),
                                       Text(
                                         'Check if something similar has already been registered.',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w300,
+                                          color: Color(0xFF999798),
+                                          height: 1.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Material(
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        side: const BorderSide(color: Color(0xFFE2DEDE)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: InkWell(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (context) => const ReportLostItemScreen(),
+                          ),
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        child: const SizedBox(
+                          height: 104,
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(24, 20, 20, 0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.only(top: 5),
+                                  child: Icon(
+                                    Icons.report_outlined,
+                                    size: 28,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                SizedBox(width: 20),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'I lost an item',
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.black,
+                                          height: 1.2,
+                                        ),
+                                      ),
+                                      SizedBox(height: 10),
+                                      Text(
+                                        'Report it and get notified if it is found.',
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w300,
