@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 
 import '../core/constants/app_constants.dart';
@@ -7,7 +8,6 @@ import '../features/auth/presentation/login_screen.dart';
 class CampusFindApp extends StatelessWidget {
   const CampusFindApp({super.key});
 
-  // Main configuration of the Flutter application
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -18,3 +18,4 @@ class CampusFindApp extends StatelessWidget {
     );
   }
 }
+ 
