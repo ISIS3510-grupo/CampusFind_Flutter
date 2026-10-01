@@ -665,13 +665,15 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(biometrics.authenticationCalls, 1);
 
-      // Cuando hay sesion guardada, el dialogo solo pide la contraseña
-      final passwordField = find.descendant(
+      // Ingresar correo y contraseña en el diálogo de inicio de sesión
+      final textFields = find.descendant(
         of: find.byType(AlertDialog),
         matching: find.byType(TextField),
       );
 
-      await tester.enterText(passwordField.first, 'Password123!');
+      await tester.enterText(textFields.at(0), 'estudiante@uniandes.edu.co');
+      await tester.pump();
+      await tester.enterText(textFields.at(1), 'Password123!');
       await tester.pump();
 
       await tester.tap(find.text('Sign in'));
@@ -794,12 +796,14 @@ void main() {
       await tester.tap(find.text('Enter with Uniandes'));
       await tester.pumpAndSettle();
 
-      final passwordField = find.descendant(
+      final textFields = find.descendant(
         of: find.byType(AlertDialog),
         matching: find.byType(TextField),
       );
 
-      await tester.enterText(passwordField.first, 'wrong-password');
+      await tester.enterText(textFields.at(0), 'estudiante@uniandes.edu.co');
+      await tester.pump();
+      await tester.enterText(textFields.at(1), 'wrong-password');
       await tester.pump();
 
       await tester.tap(find.text('Sign in'));
