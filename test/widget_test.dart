@@ -183,16 +183,30 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(biometrics.authenticationCalls, 1);
 
-      await tester.enterText(
-        find.byType(TextField).first,'estudiante@uniandes.edu.co',);
-      await tester.enterText(find.byType(TextField).last, 'Password123!');
+      // Buscamos los TextFields dentro del AlertDialog especifico
+      final emailField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ).first;
+
+      final passwordField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ).last;
+
+      await tester.enterText(emailField, 'estudiante@uniandes.edu.co');
+      await tester.pump(); // Forzar actualización de estado del controlador
+      
+      await tester.enterText(passwordField, 'Password123!');
+      await tester.pump(); // Forzar actualización de estado del controlador
+
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
+
       expect(auth.passwordCalls, 1);
       expect(auth.roleChecks, 1);
       expect(find.byType(HomeScreen), findsOneWidget);
-    },
-  );
+      });
 
   testWidgets('Unavailable biometrics fall back to the password dialog', (
     tester,
