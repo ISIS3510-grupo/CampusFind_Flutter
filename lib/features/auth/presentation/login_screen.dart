@@ -285,7 +285,7 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
     super.dispose();
   }
 
- Future<void> _signIn() async {
+  Future<void> _signIn() async {
     if (_isSigningIn) return;
 
     final email = _emailController.text.trim();
@@ -308,12 +308,9 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
       _isSigningIn = true;
       _errorMessage = null;
     });
- 
+
     // 3. Consulta a Firebase solo si pasó la validación local
-    final error = await widget.authService.signInStudent(
-      email,
-      password,
-    );
+    final error = await widget.authService.signInStudent(email, password);
     if (!mounted) return;
 
     if (error == null) {
@@ -324,7 +321,6 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
         _errorMessage = error;
       });
     }
-
   }
 
   @override

@@ -18,4 +18,3 @@ class EmailValidator {
     return null;
   }
 }
-
