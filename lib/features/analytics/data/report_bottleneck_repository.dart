@@ -14,9 +14,7 @@ class ReportBottleneckRepository {
         .get();
     final data = snapshot.data();
     if (data == null) {
-      throw StateError(
-        'Analytics document analytics/reportBottleneck is missing.',
-      );
+      throw ReportBottleneckNotGeneratedException();
     }
 
     final counts = <String, int>{};
@@ -26,4 +24,9 @@ class ReportBottleneckRepository {
     }
     return ReportBottleneckSummary.fromCounts(counts);
   }
+}
+
+class ReportBottleneckNotGeneratedException extends StateError {
+  ReportBottleneckNotGeneratedException()
+    : super('Analytics document analytics/reportBottleneck is missing.');
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../analytics/presentation/analytics_dashboard_screen.dart';
 import '../../home/presentation/home_screen.dart';
 import '../data/auth_service.dart';
 import '../data/biometric_service.dart';
@@ -11,12 +12,14 @@ class LoginScreen extends StatefulWidget {
     this.authService = const AuthService(),
     this.biometricService,
     this.homeBuilder,
+    this.staffDashboardBuilder,
     this.viewModel,
   });
 
   final AuthService authService;
   final BiometricService? biometricService;
   final WidgetBuilder? homeBuilder;
+  final WidgetBuilder? staffDashboardBuilder;
   // Injected ViewModels remain owned by the caller.
   final AuthViewModel? viewModel;
 
@@ -61,16 +64,29 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _showSignInDialog() async {
+  Future<void> _handleStaffAccess() async {
+    if (_viewModel.isBusy || _showingSignInDialog) return;
+    _viewModel.clearError();
+    await _showSignInDialog(isStaff: true);
+  }
+
+  Future<void> _showSignInDialog({bool isStaff = false}) async {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     setState(() => _showingSignInDialog = true);
     try {
       final signedIn = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => _StudentSignInDialog(viewModel: _viewModel),
+        builder: (context) =>
+            _SignInDialog(viewModel: _viewModel, isStaff: isStaff),
       );
-      if (signedIn == true && mounted) _openHome();
+      if (signedIn == true && mounted) {
+        if (isStaff) {
+          _openStaffDashboard();
+        } else {
+          _openHome();
+        }
+      }
     } finally {
       if (mounted) setState(() => _showingSignInDialog = false);
     }
@@ -84,6 +100,17 @@ class _LoginScreenState extends State<LoginScreen> {
         builder:
             widget.homeBuilder ??
             (context) => HomeScreen(authService: authService),
+      ),
+    );
+  }
+
+  void _openStaffDashboard() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder:
+            widget.staffDashboardBuilder ??
+            (context) => const AnalyticsDashboardScreen(),
       ),
     );
   }
@@ -219,11 +246,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // Visual placeholder for staff access
+                    // Staff uses the same email/password dialog with admin validation.
                     SizedBox(
                       height: 48,
                       child: OutlinedButton(
-                        onPressed: () {},
+                        onPressed: _viewModel.isBusy || _showingSignInDialog
+                            ? null
+                            : _handleStaffAccess,
                         style: OutlinedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.black,
@@ -267,16 +296,17 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _StudentSignInDialog extends StatefulWidget {
-  const _StudentSignInDialog({required this.viewModel});
+class _SignInDialog extends StatefulWidget {
+  const _SignInDialog({required this.viewModel, required this.isStaff});
 
   final AuthViewModel viewModel;
+  final bool isStaff;
 
   @override
-  State<_StudentSignInDialog> createState() => _StudentSignInDialogState();
+  State<_SignInDialog> createState() => _SignInDialogState();
 }
 
-class _StudentSignInDialogState extends State<_StudentSignInDialog> {
+class _SignInDialogState extends State<_SignInDialog> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   String? _validationMessage;
@@ -301,7 +331,10 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
 
     setState(() => _validationMessage = null);
 
-    final signedIn = await widget.viewModel.signInStudent(
+    final signIn = widget.isStaff
+        ? widget.viewModel.signInAdmin
+        : widget.viewModel.signInStudent;
+    final signedIn = await signIn(
       _emailController.text,
       _passwordController.text,
     );
@@ -326,7 +359,7 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
     return PopScope(
       canPop: !isSigningIn,
       child: AlertDialog(
-        title: const Text('Student sign in'),
+        title: Text(widget.isStaff ? 'Staff sign in' : 'Student sign in'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

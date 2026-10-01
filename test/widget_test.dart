@@ -59,6 +59,9 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
     await tester.tap(find.text('Staff access'));
     await tester.pumpAndSettle();
+    expect(find.text('Staff sign in'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Lost & Found'), findsOneWidget);
     expect(tester.takeException(), isNull);

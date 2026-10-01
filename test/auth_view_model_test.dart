@@ -9,6 +9,120 @@ import 'support/auth_fakes.dart';
 import 'support/test_fonts.dart';
 
 void main() {
+  group('staff login', () {
+    late FakeAuthService auth;
+    late AuthViewModel model;
+
+    setUp(() {
+      auth = FakeAuthService();
+      model = AuthViewModel(
+        authService: auth,
+        biometricService: FakeBiometricService(),
+      );
+    });
+    tearDown(() => model.dispose());
+
+    test('success delegates credentials and resets busy state', () async {
+      final states = <bool>[];
+      model.addListener(() => states.add(model.isBusy));
+      expect(
+        await model.signInAdmin('staff@uniandes.edu.co', 'password'),
+        isTrue,
+      );
+      expect(auth.adminCalls, 1);
+      expect(auth.adminRoleChecks, 1);
+      expect(auth.passwordCalls, 0);
+      expect(auth.lastAdminEmail, 'staff@uniandes.edu.co');
+      expect(auth.lastAdminPassword, 'password');
+      expect(model.isAuthenticated, isTrue);
+      expect(model.isBusy, isFalse);
+      expect(states, [true, false]);
+    });
+
+    test('credential failure exposes error and resets busy state', () async {
+      auth.adminPasswordError =
+          'Incorrect email or password. Please try again.';
+      expect(
+        await model.signInAdmin('staff@uniandes.edu.co', 'wrong'),
+        isFalse,
+      );
+      expect(model.errorMessage, auth.adminPasswordError);
+      expect(model.isAuthenticated, isFalse);
+      expect(model.isBusy, isFalse);
+    });
+
+    test('non-admin role is rejected even after authentication', () async {
+      auth.adminRoleError = 'This account does not have staff access.';
+      expect(
+        await model.signInAdmin('student@uniandes.edu.co', 'password'),
+        isFalse,
+      );
+      expect(model.errorMessage, auth.adminRoleError);
+      expect(model.isAuthenticated, isFalse);
+      expect(model.isBusy, isFalse);
+      expect(auth.signOutCalls, 1);
+    });
+
+    test('successful retry clears prior staff errors', () async {
+      auth.adminPasswordError = 'Wrong password';
+      await model.signInAdmin('staff@uniandes.edu.co', 'wrong');
+      auth.adminPasswordError = null;
+      expect(
+        await model.signInAdmin('staff@uniandes.edu.co', 'correct'),
+        isTrue,
+      );
+      expect(model.errorMessage, isNull);
+    });
+
+    test('unexpected failure releases busy state without success', () async {
+      auth.adminException = StateError('Unexpected');
+      expect(
+        await model.signInAdmin('staff@uniandes.edu.co', 'password'),
+        isFalse,
+      );
+      expect(model.isBusy, isFalse);
+      expect(model.isAuthenticated, isFalse);
+      expect(model.errorMessage, 'Unable to sign in. Please try again.');
+    });
+
+    test('pending staff login blocks duplicate and student actions', () async {
+      auth.pendingAdmin = Completer<String?>();
+      final signingIn = model.signInAdmin('staff@uniandes.edu.co', 'password');
+      expect(model.isBusy, isTrue);
+      expect(
+        await model.signInAdmin('staff@uniandes.edu.co', 'password'),
+        isFalse,
+      );
+      expect(
+        await model.signInStudent('student@uniandes.edu.co', 'password'),
+        isFalse,
+      );
+      await model.requestStudentAccess();
+      expect(auth.adminCalls, 1);
+      expect(auth.passwordCalls, 0);
+      expect(auth.roleChecks, 0);
+      auth.pendingAdmin!.complete(null);
+      expect(await signingIn, isTrue);
+    });
+  });
+
+  test(
+    'disposed staff login does not notify or report navigation success',
+    () async {
+      final pending = Completer<String?>();
+      final model = AuthViewModel(
+        authService: FakeAuthService(pendingAdmin: pending),
+      );
+      var notifications = 0;
+      model.addListener(() => notifications++);
+      final signingIn = model.signInAdmin('staff@uniandes.edu.co', 'password');
+      model.dispose();
+      pending.complete(null);
+      expect(await signingIn, isFalse);
+      expect(notifications, 1);
+    },
+  );
+
   test('initial state is idle without a previous result or error', () {
     final model = AuthViewModel(
       authService: FakeAuthService(),

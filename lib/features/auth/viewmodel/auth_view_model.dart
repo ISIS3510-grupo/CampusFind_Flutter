@@ -22,6 +22,12 @@ class AuthViewModel extends ChangeNotifier {
   bool get needsPasswordSignIn => _needsPasswordSignIn;
   String? get errorMessage => _errorMessage;
 
+  void clearError() {
+    if (_isBusy || _disposed) return;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   Future<void> requestStudentAccess() async {
     if (_isBusy || _disposed) return;
     _beginAuthentication();
@@ -79,6 +85,23 @@ class AuthViewModel extends ChangeNotifier {
     _needsPasswordSignIn = false;
     _errorMessage = null;
     notifyListeners();
+  }
+
+  Future<bool> signInAdmin(String email, String password) async {
+    if (_isBusy || _disposed) return false;
+    _beginAuthentication();
+    try {
+      final error = await authService.signInAdmin(email, password);
+      if (_disposed) return false;
+      _errorMessage = error;
+      _isAuthenticated = error == null;
+      return _isAuthenticated;
+    } catch (_) {
+      if (!_disposed) _errorMessage = 'Unable to sign in. Please try again.';
+      return false;
+    } finally {
+      _finishAuthentication();
+    }
   }
 
   void _finishAuthentication() {

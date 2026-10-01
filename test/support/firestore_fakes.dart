@@ -18,6 +18,7 @@ class FakeFirestore extends Fake implements FirebaseFirestore {
   final Future<void>? beforeRead;
   final queries = <Map<String, Object?>>[];
   final documentReads = <String>[];
+  final documentReadOptions = <GetOptions?>[];
   final documentWrites = <Map<String, Object?>>[];
 
   @override
@@ -148,6 +149,7 @@ class _DocumentReference extends Fake
     GetOptions? options,
   ]) async {
     database.documentReads.add(path);
+    database.documentReadOptions.add(options);
     await database.read(path);
     return _DocumentSnapshot(database.documents[path]);
   }
@@ -158,6 +160,9 @@ class _DocumentSnapshot extends Fake
   _DocumentSnapshot(this.fields);
 
   final Map<String, dynamic>? fields;
+
+  @override
+  bool get exists => fields != null;
 
   @override
   Map<String, dynamic>? data() => fields;

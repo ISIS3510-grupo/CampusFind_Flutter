@@ -138,7 +138,7 @@ void main() {
     await expectLater(
       repo.getSummary(),
       throwsA(
-        isA<StateError>().having(
+        isA<ReportBottleneckNotGeneratedException>().having(
           (error) => error.message,
           'message',
           contains(path),

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
 import 'package:campusfind_flutter/features/auth/data/biometric_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 class FakeAuthService extends AuthService {
   FakeAuthService({
@@ -13,6 +15,10 @@ class FakeAuthService extends AuthService {
     this.pendingRole,
     this.pendingSignOut,
     this.passwordException,
+    this.adminPasswordError,
+    this.adminRoleError,
+    this.pendingAdmin,
+    this.adminException,
   });
 
   bool savedSession;
@@ -27,6 +33,36 @@ class FakeAuthService extends AuthService {
   int passwordCalls = 0;
   int signOutCalls = 0;
   String? lastEmail;
+  String? adminPasswordError;
+  String? adminRoleError;
+  Completer<String?>? pendingAdmin;
+  Object? adminException;
+  int adminCalls = 0;
+  int adminRoleChecks = 0;
+  String? lastAdminEmail;
+  String? lastAdminPassword;
+
+  @override
+  Future<String?> verifyAdminRole() async {
+    adminRoleChecks++;
+    return adminRoleError;
+  }
+
+  @override
+  Future<String?> signInAdmin(String email, String password) async {
+    adminCalls++;
+    lastAdminEmail = email;
+    lastAdminPassword = password;
+    if (adminException != null) throw adminException!;
+    final error = pendingAdmin == null
+        ? adminPasswordError
+        : await pendingAdmin!.future;
+    if (error != null) return error;
+    savedSession = true;
+    final roleError = await verifyAdminRole();
+    if (roleError != null) await signOut();
+    return roleError;
+  }
 
   @override
   bool get hasCurrentUser => savedSession;
@@ -90,3 +126,55 @@ class FakeBiometricService extends BiometricService {
     return pendingResult?.future ?? Future.value(authenticated);
   }
 }
+
+// SDK doubles exercise AuthService itself without contacting Firebase.
+class FakeFirebaseAuthClient extends Fake implements FirebaseAuth {
+  FakeFirebaseAuthClient({required this.signInUser});
+
+  final User signInUser;
+  @override
+  User? currentUser;
+  Object? signInError;
+  bool failSignOut = false;
+  int signInCalls = 0;
+  int signOutCalls = 0;
+  String? lastEmail;
+  String? lastPassword;
+
+  @override
+  Future<UserCredential> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
+    signInCalls++;
+    lastEmail = email;
+    lastPassword = password;
+    if (signInError != null) throw signInError!;
+    currentUser = signInUser;
+    return _FakeUserCredential();
+  }
+
+  @override
+  Future<void> signOut() async {
+    signOutCalls++;
+    if (failSignOut) throw StateError('Sign-out failed');
+    currentUser = null;
+  }
+}
+
+class FakeFirebaseUser extends Fake implements User {
+  FakeFirebaseUser({
+    this.uid = 'staff-test',
+    this.email = 'staff@uniandes.edu.co',
+    this.emailVerified = true,
+  });
+
+  @override
+  final String uid;
+  @override
+  final String? email;
+  @override
+  final bool emailVerified;
+}
+
+class _FakeUserCredential extends Fake implements UserCredential {}
