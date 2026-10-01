@@ -184,9 +184,7 @@ void main() {
       expect(biometrics.authenticationCalls, 1);
 
       await tester.enterText(
-        find.byType(TextField).first,
-        'estudiante@uniandes.edu.co',
-      );
+        find.byType(TextField).first,'estudiante@uniandes.edu.co',);
       await tester.enterText(find.byType(TextField).last, 'Password123!');
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
