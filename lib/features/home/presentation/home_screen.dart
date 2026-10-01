@@ -4,6 +4,7 @@ import '../../../core/data/found_item_repository.dart';
 import '../../../core/data/lost_report_repository.dart';
 import '../../../core/models/lost_report.dart';
 import '../../../core/utils/report_age.dart';
+import '../../../views/report_item_screen.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../../drop_off/presentation/drop_off_instructions_screen.dart';
@@ -287,7 +288,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: const Color(0xFFFEFD05),
                       borderRadius: BorderRadius.circular(10),
                       child: InkWell(
-                        onTap: () {},
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (context) =>
+                                const ReportItemScreen(reportType: 'found'),
+                          ),
+                        ),
                         borderRadius: BorderRadius.circular(10),
                         child: const SizedBox(
                           height: 104,

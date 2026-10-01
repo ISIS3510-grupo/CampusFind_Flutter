@@ -1,44 +1,62 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../features/analytics/services/report_registration_performance_tracker.dart';
 import '../models/item_model.dart';
 import '../DAOs/item_dao.dart';
 import '../services/location_service.dart';
 
-
 class ItemViewModel extends ChangeNotifier {
-  final ItemDao _itemDao = ItemDao();
-  final LocationService _locationService = LocationService();
+  ItemViewModel({
+    this._itemDao = const ItemDao(),
+    LocationService? locationService,
+    this._firebaseAuth,
+    this._tracker = const ReportRegistrationPerformanceTracker(),
+  }) : _locationService = locationService ?? LocationService();
+
+  final ItemDao _itemDao;
+  final LocationService _locationService;
+  final FirebaseAuth? _firebaseAuth;
+  final ReportRegistrationPerformanceTracker _tracker;
 
   bool isLoading = false;
   String? errorMessage;
 
   //Solo se encarga de empaquetar la ubicación y guardar el reporte
   Future<bool> reportItem({
+    required String reportType,
     required String title,
     required String description,
     required String category,
-    required String userEmail,
   }) async {
+    if (isLoading) return false;
     isLoading = true;
     errorMessage = null;
     notifyListeners();
 
     try {
-      // 1. Pide la ubicación al servicio de GPS
-      Position position = await _locationService.getCurrentLocation();
-
-      // 2. Construye el modelo
-      ItemModel newItem = ItemModel(
-        title: title,
-        description: description,
-        category: category,
-        location: GeoPoint(position.latitude, position.longitude),
-        userEmail: userEmail,
+      final userUid = (_firebaseAuth ?? FirebaseAuth.instance).currentUser?.uid;
+      if (userUid == null || userUid.isEmpty) {
+        throw StateError('Please sign in before reporting an item.');
+      }
+      await _tracker.measure(
+        reportType: reportType,
+        operation: () async {
+          final position = await _locationService.getCurrentLocation();
+          final item = ItemModel(
+            title: title,
+            description: description,
+            category: category,
+            location: GeoPoint(position.latitude, position.longitude),
+          );
+          await _itemDao.insertItem(
+            item,
+            reportType: reportType,
+            userUid: userUid,
+          );
+        },
       );
-
-      // 3. Lo guarda mediante el DAO
-      await _itemDao.insertItem(newItem);
 
       isLoading = false;
       notifyListeners();

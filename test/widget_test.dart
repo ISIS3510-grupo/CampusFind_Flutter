@@ -7,9 +7,12 @@ import 'package:campusfind_flutter/features/auth/viewmodel/auth_view_model.dart'
 
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
+import 'package:campusfind_flutter/viewmodels/item_viewmodel.dart';
+import 'package:campusfind_flutter/views/report_item_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 import 'support/auth_fakes.dart';
 import 'support/firestore_fakes.dart';
@@ -76,65 +79,77 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Home displays S02 and preserves the other inactive actions', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    tester.view.padding = const FakeViewPadding(top: 42);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetPadding);
+  testWidgets(
+    'Home opens found reporting and preserves the other inactive actions',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      tester.view.padding = const FakeViewPadding(top: 42);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPadding);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: HomeScreen(
-          authService: FakeAuthService(savedSession: true),
-          lostReportRepository: LostReportRepository(
-            firestore: FakeFirestore(),
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => ItemViewModel(),
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: HomeScreen(
+              authService: FakeAuthService(savedSession: true),
+              lostReportRepository: LostReportRepository(
+                firestore: FakeFirestore(),
+              ),
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    for (final text in [
-      'Lost & Found',
-      'What do you need?',
-      'Search found items',
-      'I found an item',
-    ]) {
-      expect(find.text(text), findsOneWidget);
-    }
-    expect(find.text('My active report'), findsNothing);
-    expect(find.text('Scientific calculator'), findsNothing);
-    expect(find.text('Possible match'), findsNothing);
-
-    for (final text in [
-      'Search found items',
-      'I found an item',
-      'Home',
-      'Search',
-      'Profile',
-    ]) {
-      await tester.tap(find.text(text));
+      );
       await tester.pumpAndSettle();
-      expect(find.byType(HomeScreen), findsOneWidget);
+
+      for (final text in [
+        'Lost & Found',
+        'What do you need?',
+        'Search found items',
+        'I found an item',
+      ]) {
+        expect(find.text(text), findsOneWidget);
+      }
+      expect(find.text('My active report'), findsNothing);
+      expect(find.text('Scientific calculator'), findsNothing);
+      expect(find.text('Possible match'), findsNothing);
+
+      await tester.tap(find.text('I found an item'));
+      await tester.pumpAndSettle();
       expect(
         tester
-            .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
-            .currentIndex,
-        0,
+            .widget<ReportItemScreen>(find.byType(ReportItemScreen))
+            .reportType,
+        'found',
       );
-    }
-    expect(tester.takeException(), isNull);
+      expect(find.text('Report Found Item'), findsOneWidget);
+      expect(find.byType(TextFormField), findsNWidgets(3));
+      expect(find.text('Correo Uniandes'), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
-    tester.view.physicalSize = const Size(360, 640);
-    await tester.pumpAndSettle();
-    expect(find.text('My active report'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+      for (final text in ['Search found items', 'Home', 'Search', 'Profile']) {
+        await tester.tap(find.text(text));
+        await tester.pumpAndSettle();
+        expect(find.byType(HomeScreen), findsOneWidget);
+        expect(
+          tester
+              .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
+              .currentIndex,
+          0,
+        );
+      }
+      expect(tester.takeException(), isNull);
+
+      tester.view.physicalSize = const Size(360, 640);
+      await tester.pumpAndSettle();
+      expect(find.text('My active report'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('Saved student session opens Home after biometric success', (
     tester,
