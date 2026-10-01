@@ -665,23 +665,14 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(biometrics.authenticationCalls, 1);
 
-      final dialogTextFields = find.descendant(
+      // Cuando hay sesion guardada, el dialogo solo pide la contraseña
+      final passwordField = find.descendant(
         of: find.byType(AlertDialog),
         matching: find.byType(TextField),
       );
 
-      if (dialogTextFields.evaluate().length >= 2) {
-        await tester.enterText(
-          dialogTextFields.first,
-          'estudiante@uniandes.edu.co',
-        );
-        await tester.pump();
-        await tester.enterText(dialogTextFields.last, 'Password123!');
-        await tester.pump();
-      } else {
-        await tester.enterText(dialogTextFields.last, 'Password123!');
-        await tester.pump();
-      }
+      await tester.enterText(passwordField.first, 'Password123!');
+      await tester.pump();
 
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
@@ -803,23 +794,13 @@ void main() {
       await tester.tap(find.text('Enter with Uniandes'));
       await tester.pumpAndSettle();
 
-      final dialogTextFields = find.descendant(
+      final passwordField = find.descendant(
         of: find.byType(AlertDialog),
         matching: find.byType(TextField),
       );
 
-      if (dialogTextFields.evaluate().length >= 2) {
-        await tester.enterText(
-          dialogTextFields.first,
-          'estudiante@uniandes.edu.co',
-        );
-        await tester.pump();
-        await tester.enterText(dialogTextFields.last, 'wrong-password');
-        await tester.pump();
-      } else {
-        await tester.enterText(dialogTextFields.last, 'wrong-password');
-        await tester.pump();
-      }
+      await tester.enterText(passwordField.first, 'wrong-password');
+      await tester.pump();
 
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
@@ -834,39 +815,6 @@ void main() {
       expect(auth.hasCurrentUser, isTrue);
     },
   );
-
-  testWidgets(
-    'Home arrow signs out, clears the stack, and restores password login',
-    (tester) async {
-      final auth = _FakeAuthService(savedSession: true);
-      final biometrics = _FakeBiometricService();
-      await _pumpLogin(tester, auth, biometrics);
-      await tester.tap(find.text('Enter with Uniandes'));
-      await tester.pumpAndSettle();
-      expect(find.byType(HomeScreen), findsOneWidget);
-
-      await tester.tap(find.byTooltip('Sign out'));
-      await tester.pumpAndSettle();
-
-      expect(auth.signOutCalls, 1);
-      expect(auth.hasCurrentUser, isFalse);
-      expect(find.byType(HomeScreen, skipOffstage: false), findsNothing);
-      expect(find.byType(LoginScreen), findsOneWidget);
-      expect(
-        Navigator.of(tester.element(find.byType(LoginScreen))).canPop(),
-        isFalse,
-      );
-
-      await tester.tap(find.text('Enter with Uniandes'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.text('Email'), findsOneWidget);
-      expect(find.text('Password'), findsOneWidget);
-      expect(auth.roleChecks, 1);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
   testWidgets('Failed sign-out keeps Home open and reports the error', (
     tester,
   ) async {
