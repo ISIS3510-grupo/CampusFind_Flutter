@@ -47,8 +47,12 @@ void main() {
       biometricService: biometrics,
     );
     final analytics = createReportBottleneckViewModel(firestore: database);
+    final registrationTime = createReportRegistrationTimeViewModel(
+      firestore: database,
+    );
     addTearDown(model.dispose);
     addTearDown(analytics.dispose);
+    addTearDown(registrationTime.dispose);
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.lightTheme,
@@ -58,8 +62,10 @@ void main() {
             homeBuilds++;
             return const Scaffold(body: Text('Student destination'));
           },
-          staffDashboardBuilder: (context) =>
-              AnalyticsDashboardScreen(reportBottleneckViewModel: analytics),
+          staffDashboardBuilder: (context) => AnalyticsDashboardScreen(
+            reportBottleneckViewModel: analytics,
+            reportRegistrationTimeViewModel: registrationTime,
+          ),
         ),
       ),
     );
@@ -113,20 +119,22 @@ void main() {
     },
   );
 
-  testWidgets(
-    'opening the staff dashboard loads only the precomputed aggregate',
-    (tester) async {
-      await openStaffForm(tester);
-      await enterCredentials(tester);
-      await tester.tap(find.text('Sign in'));
-      await tester.pumpAndSettle();
-      expect(find.byType(ReportBottleneckPanel), findsOneWidget);
-      expect(find.text('8'), findsOneWidget);
-      expect(database.documentReads, ['analytics/reportBottleneck']);
-      expect(database.queries, isEmpty);
-      expect(database.documentWrites, isEmpty);
-    },
-  );
+  testWidgets('opening the staff dashboard loads only precomputed aggregates', (
+    tester,
+  ) async {
+    await openStaffForm(tester);
+    await enterCredentials(tester);
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReportBottleneckPanel), findsOneWidget);
+    expect(find.text('8'), findsOneWidget);
+    expect(database.documentReads, [
+      'analytics/reportBottleneck',
+      'analytics/reportRegistrationTime',
+    ]);
+    expect(database.queries, isEmpty);
+    expect(database.documentWrites, isEmpty);
+  });
 
   testWidgets(
     'missing aggregate offers Refresh and aggregates only after the tap',
@@ -142,7 +150,12 @@ void main() {
       );
       expect(database.queries, isEmpty);
       expect(database.documentWrites, isEmpty);
-      await tester.tap(find.text('Refresh analytics'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ReportBottleneckPanel),
+          matching: find.text('Refresh analytics'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(database.queries, [
         {'collection': 'lostReports'},

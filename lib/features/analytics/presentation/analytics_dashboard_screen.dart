@@ -3,19 +3,23 @@ import 'package:flutter/material.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../viewmodel/report_bottleneck_view_model.dart';
+import '../viewmodel/report_registration_time_view_model.dart';
 import 'report_bottleneck_panel.dart';
+import 'report_registration_time_panel.dart';
 
 // Staff Access opens this screen after admin validation.
 class AnalyticsDashboardScreen extends StatefulWidget {
   const AnalyticsDashboardScreen({
     super.key,
     this.reportBottleneckViewModel,
+    this.reportRegistrationTimeViewModel,
     this.additionalPanels = const [],
     this.authService = const AuthService(),
     this.loginBuilder,
   });
 
   final ReportBottleneckViewModel? reportBottleneckViewModel;
+  final ReportRegistrationTimeViewModel? reportRegistrationTimeViewModel;
   final List<Widget> additionalPanels;
   final AuthService authService;
   final WidgetBuilder? loginBuilder;
@@ -80,6 +84,10 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                 children: [
                   ReportBottleneckPanel(
                     viewModel: widget.reportBottleneckViewModel,
+                  ),
+                  const SizedBox(height: 20),
+                  ReportRegistrationTimePanel(
+                    viewModel: widget.reportRegistrationTimeViewModel,
                   ),
                   for (final panel in widget.additionalPanels)
                     Padding(

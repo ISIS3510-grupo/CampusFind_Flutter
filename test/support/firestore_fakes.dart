@@ -19,7 +19,9 @@ class FakeFirestore extends Fake implements FirebaseFirestore {
   final queries = <Map<String, Object?>>[];
   final documentReads = <String>[];
   final documentReadOptions = <GetOptions?>[];
+  final queryReadOptions = <GetOptions?>[];
   final documentWrites = <Map<String, Object?>>[];
+  int _nextId = 0;
 
   @override
   CollectionReference<Map<String, dynamic>> collection(String collectionPath) {
@@ -77,7 +79,17 @@ class _Collection extends Fake
 
   @override
   DocumentReference<Map<String, dynamic>> doc([String? path]) {
-    return _DocumentReference(database, '${this.path}/$path');
+    final id = path ?? 'auto-${++database._nextId}';
+    return _DocumentReference(database, '${this.path}/$id');
+  }
+
+  @override
+  Future<DocumentReference<Map<String, dynamic>>> add(
+    Map<String, dynamic> data,
+  ) async {
+    final reference = doc();
+    await reference.set(data);
+    return reference;
   }
 }
 
@@ -91,6 +103,7 @@ class _Query extends Fake implements Query<Map<String, dynamic>> {
 
   @override
   Future<QuerySnapshot<Map<String, dynamic>>> get([GetOptions? options]) async {
+    database.queryReadOptions.add(options);
     await database.read(path);
     return _QuerySnapshot([
       for (final entry in database.documents.entries)

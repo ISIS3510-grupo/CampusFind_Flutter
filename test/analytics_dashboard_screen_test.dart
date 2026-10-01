@@ -4,6 +4,7 @@ import 'package:campusfind_flutter/core/theme/app_theme.dart';
 import 'package:campusfind_flutter/features/analytics/domain/report_bottleneck_summary.dart';
 import 'package:campusfind_flutter/features/analytics/presentation/analytics_dashboard_screen.dart';
 import 'package:campusfind_flutter/features/analytics/presentation/report_bottleneck_panel.dart';
+import 'package:campusfind_flutter/features/analytics/presentation/report_registration_time_panel.dart';
 import 'package:campusfind_flutter/features/analytics/viewmodel/report_bottleneck_view_model.dart';
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:flutter/material.dart';
@@ -11,13 +12,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support/analytics_fakes.dart';
 import 'support/auth_fakes.dart';
+import 'support/registration_time_fakes.dart';
 import 'support/test_fonts.dart';
 
 void main() {
   setUpAll(loadTestFonts);
 
   testWidgets(
-    'dashboard contains only the Report Bottleneck panel by default',
+    'dashboard contains bottleneck then registration time by default',
     (tester) async {
       final repository = FakeReportBottleneckRepository();
       final model = ReportBottleneckViewModel(repository: repository);
@@ -25,7 +27,10 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.lightTheme,
-          home: AnalyticsDashboardScreen(reportBottleneckViewModel: model),
+          home: AnalyticsDashboardScreen(
+            reportBottleneckViewModel: model,
+            reportRegistrationTimeViewModel: testRegistrationTimeViewModel(),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -34,6 +39,13 @@ void main() {
       expect(find.byIcon(Icons.arrow_back), findsOneWidget);
       expect(find.byType(ReportBottleneckPanel), findsOneWidget);
       expect(find.text('Report bottleneck'), findsOneWidget);
+      expect(find.byType(ReportRegistrationTimePanel), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byType(ReportRegistrationTimePanel)).dy,
+        greaterThan(
+          tester.getBottomLeft(find.byType(ReportBottleneckPanel)).dy,
+        ),
+      );
       expect(
         tester
             .widget<AnalyticsDashboardScreen>(
@@ -59,15 +71,34 @@ void main() {
           theme: AppTheme.lightTheme,
           home: AnalyticsDashboardScreen(
             reportBottleneckViewModel: model,
+            reportRegistrationTimeViewModel: testRegistrationTimeViewModel(),
             additionalPanels: const [SizedBox(key: marker, height: 12)],
           ),
         ),
       );
       expect(find.byKey(marker), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(marker)).dy,
+        greaterThan(
+          tester.getBottomLeft(find.byType(ReportRegistrationTimePanel)).dy,
+        ),
+      );
+      expect(
+        find.descendant(
+          of: find.byType(ReportBottleneckPanel),
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
       repository.pending!.completeError(StateError('Offline'));
       await tester.pumpAndSettle();
       expect(find.byKey(marker), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(marker)).dy,
+        greaterThan(
+          tester.getBottomLeft(find.byType(ReportRegistrationTimePanel)).dy,
+        ),
+      );
       expect(find.text('Analytics'), findsOneWidget);
       expect(
         find.descendant(
@@ -103,6 +134,7 @@ void main() {
         builder: (context) => AnalyticsDashboardScreen(
           authService: auth,
           reportBottleneckViewModel: model,
+          reportRegistrationTimeViewModel: testRegistrationTimeViewModel(),
         ),
       ),
     );
@@ -142,6 +174,7 @@ void main() {
           home: AnalyticsDashboardScreen(
             authService: auth,
             reportBottleneckViewModel: model,
+            reportRegistrationTimeViewModel: testRegistrationTimeViewModel(),
             loginBuilder: (context) =>
                 const Scaffold(body: Text('Login destination')),
           ),
@@ -185,6 +218,7 @@ void main() {
         home: AnalyticsDashboardScreen(
           authService: auth,
           reportBottleneckViewModel: model,
+          reportRegistrationTimeViewModel: testRegistrationTimeViewModel(),
         ),
       ),
     );
