@@ -318,10 +318,27 @@ void main() {
 
       await tester.tap(find.text('Enter with Uniandes'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).first,'estudiante@uniandes.edu.co',);
-      await tester.enterText(find.byType(TextField).last, 'wrong-password');
+
+      // --- AQUÍ EMPIEZA LA CORRECCIÓN ---
+      final emailField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ).first;
+
+      final passwordField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ).last;
+
+      await tester.enterText(emailField, 'estudiante@uniandes.edu.co');
+      await tester.pump();
+
+      await tester.enterText(passwordField, 'wrong-password');
+      await tester.pump();
+
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
+      // --- AQUÍ TERMINA LA CORRECCIÓN ---
 
       expect(
         find.text('Incorrect email or password. Please try again.'),
@@ -333,7 +350,6 @@ void main() {
       expect(auth.hasCurrentUser, isTrue);
     },
   );
-
   testWidgets(
     'Home arrow signs out, clears the stack, and restores password login',
     (tester) async {
