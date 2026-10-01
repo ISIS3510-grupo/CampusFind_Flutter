@@ -1,3 +1,4 @@
+import 'package:campusfind_flutter/views/report_item_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../core/constants/app_constants.dart';
@@ -14,7 +15,9 @@ class CampusFindApp extends StatelessWidget {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const LoginScreen(),
+      home: const ReportItemScreen(),
+      //home: const LoginScreen(),
     );
   }
 }
+ 
