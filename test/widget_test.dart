@@ -165,8 +165,7 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
   });
 
-  testWidgets(
-    'Biometric false opens password login without role checks or navigation',
+  testWidgets('Biometric false opens password login without role checks or navigation',
     (tester) async {
       final auth = _FakeAuthService(savedSession: true);
       final biometrics = _FakeBiometricService(authenticated: false);
@@ -186,9 +185,9 @@ void main() {
 
       await tester.enterText(
         find.byType(TextField).first,
-        'student@example.com',
+        'estudiante@uniandes.edu.co',
       );
-      await tester.enterText(find.byType(TextField).last, 'test-password');
+      await tester.enterText(find.byType(TextField).last, 'Password123!');
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
       expect(auth.passwordCalls, 1);
@@ -307,10 +306,7 @@ void main() {
 
       await tester.tap(find.text('Enter with Uniandes'));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byType(TextField).first,
-        'student@example.com',
-      );
+      await tester.enterText(find.byType(TextField).first,'estudiante@uniandes.edu.co',);
       await tester.enterText(find.byType(TextField).last, 'wrong-password');
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../home/presentation/home_screen.dart';
 import '../data/auth_service.dart';
 import '../data/biometric_service.dart';
+import '../../../utils/email_validator.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -284,23 +285,34 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
     super.dispose();
   }
 
-  Future<void> _signIn() async {
+ Future<void> _signIn() async {
     if (_isSigningIn) return;
 
-    if (_emailController.text.trim().isEmpty ||
-        _passwordController.text.isEmpty) {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    // 1. Validar campos vacíos
+    if (email.isEmpty || password.isEmpty) {
       setState(() => _errorMessage = 'Please enter your email and password.');
       return;
+    }
+
+    // 2. Interceptar y validar el correo de Uniandes antes de ir a Firebase
+    final emailValidationError = EmailValidator.validateUniandesEmail(email);
+    if (emailValidationError != null) {
+      setState(() => _errorMessage = emailValidationError);
+      return; // Se detiene aquí y no llama al backend
     }
 
     setState(() {
       _isSigningIn = true;
       _errorMessage = null;
     });
-
+ 
+    // 3. Consulta a Firebase solo si pasó la validación local
     final error = await widget.authService.signInStudent(
-      _emailController.text,
-      _passwordController.text,
+      email,
+      password,
     );
     if (!mounted) return;
 
@@ -312,6 +324,7 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
         _errorMessage = error;
       });
     }
+
   }
 
   @override
