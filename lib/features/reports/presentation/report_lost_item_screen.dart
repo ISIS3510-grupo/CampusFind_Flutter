@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 
+import 'package:campusfind_flutter/features/analytics/data/firestore_feature_usage_tracker.dart';
+import 'package:campusfind_flutter/features/analytics/domain/app_feature.dart';
+import 'package:campusfind_flutter/features/analytics/domain/feature_usage_tracker.dart';
 import 'package:campusfind_flutter/features/reports/data/lost_report_repository_impl.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report_repository.dart';
 import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_controller.dart';
 
 class ReportLostItemScreen extends StatefulWidget {
-  const ReportLostItemScreen({super.key, this.repository});
+  const ReportLostItemScreen({
+    super.key,
+    this.repository,
+    this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
+  });
 
   // Injected in tests; the app uses the Firestore implementation.
   final LostReportRepository? repository;
+  final FeatureUsageTracker featureUsageTracker;
 
   @override
   State<ReportLostItemScreen> createState() => _ReportLostItemScreenState();
@@ -60,6 +68,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
       ),
     );
     if (!mounted || result == null) return;
+    widget.featureUsageTracker.track(AppFeature.submitLostReport);
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
