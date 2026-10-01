@@ -58,8 +58,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (error == null) {
         _openHome();
       } else {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
       }
     } catch (_) {
       if (mounted) await _showSignInDialog();

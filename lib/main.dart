@@ -14,9 +14,7 @@ Future<void> main() async {
 
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ItemViewModel()),
-      ],
+      providers: [ChangeNotifierProvider(create: (_) => ItemViewModel())],
       child: const CampusFindApp(),
     ),
   );

@@ -5,7 +5,6 @@ import '../models/item_model.dart';
 import '../DAOs/item_dao.dart';
 import '../services/location_service.dart';
 
-
 class ItemViewModel extends ChangeNotifier {
   final ItemDao _itemDao = ItemDao();
   final LocationService _locationService = LocationService();

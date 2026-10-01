@@ -37,12 +37,16 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Objeto reportado con éxito con ubicación GPS')),
+            const SnackBar(
+              content: Text('Objeto reportado con éxito con ubicación GPS'),
+            ),
           );
           _formKey.currentState!.reset();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(viewModel.errorMessage ?? 'Error al guardar')),
+            SnackBar(
+              content: Text(viewModel.errorMessage ?? 'Error al guardar'),
+            ),
           );
         }
       }
@@ -64,22 +68,27 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(labelText: 'Título'),
-                validator: (val) => val == null || val.isEmpty ? 'Ingresa un título' : null,
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Ingresa un título' : null,
               ),
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(labelText: 'Descripción'),
-                validator: (val) => val == null || val.isEmpty ? 'Ingresa una descripción' : null,
+                validator: (val) => val == null || val.isEmpty
+                    ? 'Ingresa una descripción'
+                    : null,
               ),
               TextFormField(
                 controller: _categoryController,
                 decoration: const InputDecoration(labelText: 'Categoría'),
-                validator: (val) => val == null || val.isEmpty ? 'Ingresa una categoría' : null,
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Ingresa una categoría' : null,
               ),
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(labelText: 'Correo Uniandes'),
-                validator: (val) => val == null || val.isEmpty ? 'Ingresa tu correo' : null,
+                validator: (val) =>
+                    val == null || val.isEmpty ? 'Ingresa tu correo' : null,
               ),
               const SizedBox(height: 20),
               viewModel.isLoading
