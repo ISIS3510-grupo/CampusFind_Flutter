@@ -6,16 +6,19 @@ import 'package:flutter_test/flutter_test.dart';
 
 class FakeFirestore extends Fake implements FirebaseFirestore {
   FakeFirestore({
-    this.documents = const {},
+    Map<String, Map<String, dynamic>> documents = const {},
     this.errors = const {},
+    this.writeErrors = const {},
     this.beforeRead,
-  });
+  }) : documents = Map.of(documents);
 
   final Map<String, Map<String, dynamic>> documents;
   final Map<String, Object> errors;
+  final Map<String, Object> writeErrors;
   final Future<void>? beforeRead;
   final queries = <Map<String, Object?>>[];
   final documentReads = <String>[];
+  final documentWrites = <Map<String, Object?>>[];
 
   @override
   CollectionReference<Map<String, dynamic>> collection(String collectionPath) {
@@ -35,6 +38,18 @@ class _Collection extends Fake
   final FakeFirestore database;
   @override
   final String path;
+
+  @override
+  Future<QuerySnapshot<Map<String, dynamic>>> get([GetOptions? options]) async {
+    database.queries.add({'collection': path});
+    await database.read(path);
+    return _QuerySnapshot([
+      for (final entry in database.documents.entries)
+        if (entry.key.startsWith('$path/') &&
+            entry.key.split('/').length == path.split('/').length + 1)
+          _QueryDocument(entry.key.split('/').last, entry.value),
+    ]);
+  }
 
   @override
   Query<Map<String, dynamic>> where(
@@ -111,6 +126,22 @@ class _DocumentReference extends Fake
   final FakeFirestore database;
   @override
   final String path;
+
+  @override
+  Future<void> set(Map<String, dynamic> data, [SetOptions? options]) async {
+    // Only replacement writes are needed by the current tests.
+    if (options != null) {
+      throw UnsupportedError('SetOptions are not supported.');
+    }
+    database.documentWrites.add({
+      'path': path,
+      'data': Map<String, dynamic>.of(data),
+    });
+    if (database.writeErrors.containsKey(path)) {
+      throw database.writeErrors[path]!;
+    }
+    database.documents[path] = Map.of(data);
+  }
 
   @override
   Future<DocumentSnapshot<Map<String, dynamic>>> get([
