@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../lib/utils/email_validator.dart';
+import 'package:campusfind_flutter/utils/email_validator.dart';
 
 void main() {
   group('EmailValidator - Uniandes Email Validation', () {
