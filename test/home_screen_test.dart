@@ -5,6 +5,8 @@ import 'package:campusfind_flutter/core/data/lost_report_repository.dart';
 import 'package:campusfind_flutter/core/theme/app_theme.dart';
 import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
+import 'package:campusfind_flutter/features/drop_off/presentation/drop_off_instructions_screen.dart';
+import 'package:campusfind_flutter/features/drop_off/viewmodel/drop_off_instructions_view_model.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
 import 'package:campusfind_flutter/features/home/viewmodel/home_view_model.dart';
 import 'package:campusfind_flutter/features/matching/data/matching_config_repository.dart';
@@ -14,10 +16,144 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/firestore_fakes.dart';
+import 'support/drop_off_fakes.dart';
 import 'support/test_fonts.dart';
 
 void main() {
   setUpAll(loadTestFonts);
+
+  testWidgets('Alerts pushes the injected destination and back restores Home', (
+    tester,
+  ) async {
+    final database = FakeFirestore();
+    var opened = 0;
+    await _pumpHome(
+      tester,
+      database,
+      dropOffBuilder: (context, homeBuilder) {
+        opened++;
+        return Scaffold(appBar: AppBar(title: const Text('Test drop-off')));
+      },
+    );
+    await tester.pumpAndSettle();
+    final originalHome = tester.state(find.byType(HomeScreen));
+    final originalReads = database.queries.length;
+    for (final action in ['Home', 'Search', 'Profile']) {
+      await tester.tap(find.text(action));
+      await tester.pumpAndSettle();
+      expect(opened, 0);
+      expect(tester.state(find.byType(HomeScreen)), same(originalHome));
+      expect(
+        tester
+            .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
+            .currentIndex,
+        0,
+      );
+    }
+    await tester.tap(find.text('Alerts'));
+    await tester.pumpAndSettle();
+    expect(opened, 1);
+    expect(find.text('Test drop-off'), findsOneWidget);
+    expect(find.byType(HomeScreen), findsNothing);
+    expect(find.byType(HomeScreen, skipOffstage: false), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(tester.state(find.byType(HomeScreen)), same(originalHome));
+    expect(database.queries, hasLength(originalReads));
+  });
+
+  testWidgets('S12 back arrow returns to the existing Home without reloading', (
+    tester,
+  ) async {
+    final database = FakeFirestore();
+    final dropOffModel = DropOffInstructionsViewModel(
+      repository: FakeOfficeLocationRepository(),
+    );
+    addTearDown(dropOffModel.dispose);
+    await _pumpHome(
+      tester,
+      database,
+      dropOffBuilder: (context, homeBuilder) => DropOffInstructionsScreen(
+        viewModel: dropOffModel,
+        homeBuilder: homeBuilder,
+        mapsLauncher: FakeMapsLauncherService(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final originalHome = tester.state(find.byType(HomeScreen));
+    final originalReads = database.queries.length;
+    await tester.tap(find.text('Alerts'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DropOffInstructionsScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(tester.state(find.byType(HomeScreen)), same(originalHome));
+    expect(database.queries, hasLength(originalReads));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'S12 Back to Home clears the stack and preserves Home dependencies',
+    (tester) async {
+      final database = FakeFirestore();
+      final auth = _HomeAuth('student-1');
+      final dropOffModel = DropOffInstructionsViewModel(
+        repository: FakeOfficeLocationRepository(),
+      );
+      addTearDown(dropOffModel.dispose);
+      await _pumpHome(
+        tester,
+        database,
+        auth: auth,
+        dropOffBuilder: (context, homeBuilder) => DropOffInstructionsScreen(
+          viewModel: dropOffModel,
+          homeBuilder: homeBuilder,
+          mapsLauncher: FakeMapsLauncherService(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final original = tester
+          .widget<HomeScreen>(find.byType(HomeScreen))
+          .viewModel!;
+      // Repeat the full flow to check that the return route retains the builder.
+      for (var visit = 0; visit < 2; visit++) {
+        await tester.tap(find.text('Alerts'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Back to Home'));
+        await tester.tap(find.text('Back to Home'));
+        await tester.pumpAndSettle();
+        expect(find.byType(HomeScreen, skipOffstage: false), findsOneWidget);
+        expect(
+          find.byType(DropOffInstructionsScreen, skipOffstage: false),
+          findsNothing,
+        );
+        final returned = tester.widget<HomeScreen>(find.byType(HomeScreen));
+        expect(returned.authService, same(auth));
+        expect(
+          returned.lostReportRepository,
+          same(original.lostReportRepository),
+        );
+        expect(
+          returned.foundItemRepository,
+          same(original.foundItemRepository),
+        );
+        expect(
+          returned.matchingConfigRepository,
+          same(original.matchingConfigRepository),
+        );
+        expect(
+          returned.createMatchingService,
+          same(original.createMatchingService),
+        );
+        expect(
+          Navigator.of(tester.element(find.byType(HomeScreen))).canPop(),
+          isFalse,
+        );
+      }
+      expect(auth.signOutCalls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'no report hides the entire section and skips candidates and config',
@@ -377,6 +513,7 @@ Future<void> _pumpHome(
   WidgetTester tester,
   FakeFirestore database, {
   _HomeAuth? auth,
+  Widget Function(BuildContext, WidgetBuilder)? dropOffBuilder,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
@@ -392,7 +529,7 @@ Future<void> _pumpHome(
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.lightTheme,
-      home: HomeScreen(viewModel: viewModel),
+      home: HomeScreen(viewModel: viewModel, dropOffBuilder: dropOffBuilder),
     ),
   );
 }

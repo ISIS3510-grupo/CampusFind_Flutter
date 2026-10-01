@@ -76,7 +76,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Home displays the S02 content and inactive navigation', (
+  testWidgets('Home displays S02 and preserves the other inactive actions', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -114,8 +114,8 @@ void main() {
     for (final text in [
       'Search found items',
       'I found an item',
+      'Home',
       'Search',
-      'Alerts',
       'Profile',
     ]) {
       await tester.tap(find.text(text));

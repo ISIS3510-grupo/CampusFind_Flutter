@@ -6,6 +6,7 @@ import '../../../core/models/lost_report.dart';
 import '../../../core/utils/report_age.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
+import '../../drop_off/presentation/drop_off_instructions_screen.dart';
 import '../../matching/data/matching_config_repository.dart';
 import '../../matching/presentation/match_alert_screen.dart';
 import '../../matching/services/matching_service.dart';
@@ -20,6 +21,7 @@ class HomeScreen extends StatefulWidget {
     this.matchingConfigRepository = const MatchingConfigRepository(),
     this.createMatchingService,
     this.viewModel,
+    this.dropOffBuilder,
   });
 
   final AuthService authService;
@@ -29,6 +31,9 @@ class HomeScreen extends StatefulWidget {
   final MatchingService Function(double threshold)? createMatchingService;
   // Injected ViewModels remain owned by the caller.
   final HomeViewModel? viewModel;
+  // Receives the same Home configuration for S12's Back to Home action.
+  final Widget Function(BuildContext context, WidgetBuilder homeBuilder)?
+  dropOffBuilder;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -69,6 +74,26 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute<void>(
         builder: (context) =>
             MatchAlertScreen(lostReport: report, matchResult: match),
+      ),
+    );
+  }
+
+  void _openDropOff() {
+    final home = HomeScreen(
+      authService: _viewModel.authService,
+      lostReportRepository: _viewModel.lostReportRepository,
+      foundItemRepository: _viewModel.foundItemRepository,
+      matchingConfigRepository: _viewModel.matchingConfigRepository,
+      createMatchingService: _viewModel.createMatchingService,
+      dropOffBuilder: widget.dropOffBuilder,
+    );
+    Widget homeBuilder(BuildContext context) => home;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            widget.dropOffBuilder?.call(context, homeBuilder) ??
+            DropOffInstructionsScreen(homeBuilder: homeBuilder),
       ),
     );
   }
@@ -357,7 +382,10 @@ class _HomeScreenState extends State<HomeScreen> {
             height: 61,
             child: BottomNavigationBar(
               currentIndex: 0,
-              onTap: (_) {},
+              onTap: (index) {
+                // Temporary Sprint testing entry point for S12.
+                if (index == 2) _openDropOff();
+              },
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
               elevation: 0,
