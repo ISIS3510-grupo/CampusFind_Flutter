@@ -3,8 +3,8 @@ import '../models/item_model.dart';
 
 class ItemDao {
   // Referencia a la colección 'items' en Firestore
-  final CollectionReference _itemsCollection =
-      FirebaseFirestore.instance.collection('items');
+  final CollectionReference _itemsCollection = FirebaseFirestore.instance
+      .collection('items');
 
   /// Inserta un nuevo objeto reportado en Firestore
   Future<void> insertItem(ItemModel item) async {
