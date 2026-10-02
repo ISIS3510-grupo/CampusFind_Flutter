@@ -50,7 +50,7 @@ class LostReport {
     required this.description,
     required this.status,
     this.locationName,
-    this.imageUrl,
+    this.photoPath,
     this.reportedAt,
   });
 
@@ -60,7 +60,7 @@ class LostReport {
   final String description;
   final String status;
   final String? locationName;
-  final String? imageUrl;
+  final String? photoPath;
   final DateTime? reportedAt;
 
   bool get isActive => status != 'claimed' && status != 'closed';
