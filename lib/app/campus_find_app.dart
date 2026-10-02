@@ -1,9 +1,9 @@
 
 import 'package:flutter/material.dart';
 
-import '../core/constants/app_constants.dart';
-import '../core/theme/app_theme.dart';
-import '../features/auth/presentation/login_screen.dart';
+import 'package:campusfind_flutter/core/constants/app_constants.dart';
+import 'package:campusfind_flutter/core/theme/app_theme.dart';
+import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 
 class CampusFindApp extends StatelessWidget {
   const CampusFindApp({super.key});

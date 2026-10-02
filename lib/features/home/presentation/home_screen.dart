@@ -3,11 +3,24 @@ import '../../../views/report_item_screen.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
 
+import 'package:campusfind_flutter/features/analytics/data/firestore_feature_usage_tracker.dart';
+import 'package:campusfind_flutter/features/analytics/domain/app_feature.dart';
+import 'package:campusfind_flutter/features/analytics/domain/feature_usage_tracker.dart';
+import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
+import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
+import 'package:campusfind_flutter/features/home/presentation/widgets/home_action_card.dart';
+import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.authService = const AuthService()});
+  const HomeScreen({
+    super.key,
+    this.authService = const AuthService(),
+    this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
+  });
 
   final AuthService authService;
+  final FeatureUsageTracker featureUsageTracker;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -251,9 +264,41 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                               ],
+                    HomeActionCard(
+                      icon: Icons.search,
+                      title: 'Search found items',
+                      subtitle: 'Check if something similar has already been registered.',
+                      large: true,
+                      onTap: () => widget.featureUsageTracker.track(
+                        AppFeature.searchFoundItems,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    HomeActionCard(
+                      icon: Icons.report_outlined,
+                      title: 'I lost an item',
+                      subtitle: 'Report it and get notified if it is found.',
+                      onTap: () {
+                        widget.featureUsageTracker.track(
+                          AppFeature.reportLostItem,
+                        );
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (context) => ReportLostItemScreen(
+                              featureUsageTracker: widget.featureUsageTracker,
                             ),
                           ),
-                        ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    HomeActionCard(
+                      icon: Icons.add,
+                      title: 'I found an item',
+                      subtitle: 'Report it and see where to deliver it.',
+                      highlighted: true,
+                      onTap: () => widget.featureUsageTracker.track(
+                        AppFeature.reportFoundItem,
                       ),
                     ),
                     const SizedBox(height: 36),
