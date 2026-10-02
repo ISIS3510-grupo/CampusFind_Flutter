@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../home/presentation/home_screen.dart';
-import '../data/auth_service.dart';
-import '../data/biometric_service.dart';
+import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
+import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
+import 'package:campusfind_flutter/features/auth/data/biometric_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
