@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:campusfind_flutter/core/network/connectivity_service.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report_repository.dart';
@@ -67,21 +69,23 @@ class LostReportRepositoryImpl implements LostReportRepository {
 
   @override
   Future<int> syncPending() async {
-    if (!await _connectivity.isOnline()) return 0;
+    final reports = await _pending.load();
+    if (!await _connectivity.isOnline()) return reports.length;
 
     var sent = 0;
-    for (final report in await _pending.load()) {
+    for (final report in reports) {
       try {
         await _createIfMissing(report.reportId, report.draft);
         if (!await _uploadPhoto(report.reportId, report.draft)) break;
         await _pending.remove(report.reportId);
         sent++;
-      } catch (_) {
+      } catch (error) {
         // Still offline or signed out: the rest waits for the next try.
+        debugPrint('Pending report not sent yet: $error');
         break;
       }
     }
-    return sent;
+    return reports.length - sent;
   }
 
   // Same id on every try: if a previous try reached Firestore, it is not

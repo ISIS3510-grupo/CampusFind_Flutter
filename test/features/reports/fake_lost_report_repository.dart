@@ -14,6 +14,9 @@ class FakeLostReportRepository implements LostReportRepository {
   final bool photoFailed;
   final bool offline;
   int syncCalls = 0;
+
+  // What each syncPending call returns (reports still waiting); then 0.
+  List<int> waitingAfterSync = [];
   final List<LostReportDraft> submitted = [];
 
   @override
@@ -36,6 +39,6 @@ class FakeLostReportRepository implements LostReportRepository {
   @override
   Future<int> syncPending() async {
     syncCalls++;
-    return 0;
+    return waitingAfterSync.isEmpty ? 0 : waitingAfterSync.removeAt(0);
   }
 }

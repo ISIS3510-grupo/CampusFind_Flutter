@@ -101,8 +101,18 @@ class FirestoreReportDataSource {
   // Uses the local cache too, so a report still waiting in Firestore's own
   // offline queue is not created twice.
   Future<bool> reportExists(String reportId) async {
-    final doc = await _firestore.collection('lostReports').doc(reportId).get();
-    return doc.exists;
+    try {
+      final doc = await _firestore
+          .collection('lostReports')
+          .doc(reportId)
+          .get();
+      return doc.exists;
+    } on FirebaseException catch (error) {
+      // The rules only let the owner read a report, so reading one that does
+      // not exist yet is denied. The id is ours, so denied means "not created".
+      if (error.code == 'permission-denied') return false;
+      rethrow;
+    }
   }
 
   // The owner adds the photo after the upload, so Storage could check the owner.

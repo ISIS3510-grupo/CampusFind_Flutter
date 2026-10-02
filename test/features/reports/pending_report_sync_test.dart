@@ -25,6 +25,7 @@ void main() {
       repository: repository,
       connectivity: connectivity,
       signedInChanges: signedIn.stream,
+      retryDelays: const [],
     )..start();
 
     connectivity.controller.add(false);
@@ -38,6 +39,28 @@ void main() {
     await pumpEventQueue();
     expect(repository.syncCalls, 2);
 
+    await sync.stop();
+  });
+
+  test('retries while reports are still waiting', () async {
+    final repository = FakeLostReportRepository()..waitingAfterSync = [2, 1];
+    final connectivity = _StreamConnectivity();
+    final sync = PendingReportSync(
+      repository: repository,
+      connectivity: connectivity,
+      signedInChanges: const Stream.empty(),
+      retryDelays: const [
+        Duration(milliseconds: 1),
+        Duration(milliseconds: 1),
+        Duration(milliseconds: 1),
+      ],
+    )..start();
+
+    connectivity.controller.add(true);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    // First try leaves 2, the retry leaves 1, the next one sends the rest.
+    expect(repository.syncCalls, 3);
     await sync.stop();
   });
 }

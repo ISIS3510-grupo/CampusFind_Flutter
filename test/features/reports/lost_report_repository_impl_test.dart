@@ -177,9 +177,9 @@ void main() {
     );
 
     connectivity.online = true;
-    final sent = await repository.syncPending();
+    final waiting = await repository.syncPending();
 
-    expect(sent, 1);
+    expect(waiting, 0);
     expect(calls, [
       'create ${queued.reportId}',
       'upload /photos/keys.jpg',
@@ -192,7 +192,7 @@ void main() {
     connectivity.online = false;
     await repository.submit(_draft());
 
-    expect(await repository.syncPending(), 0);
+    expect(await repository.syncPending(), 1);
     expect(pending.reports, hasLength(1));
   });
 

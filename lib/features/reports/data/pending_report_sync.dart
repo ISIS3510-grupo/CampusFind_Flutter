@@ -9,11 +9,22 @@ class PendingReportSync {
     required this.repository,
     required this.connectivity,
     required this.signedInChanges,
+    this.retryDelays = const [
+      Duration(seconds: 5),
+      Duration(seconds: 15),
+      Duration(seconds: 30),
+      Duration(seconds: 60),
+    ],
   });
 
   final LostReportRepository repository;
   final ConnectivityService connectivity;
   final Stream<bool> signedInChanges;
+
+  // The "connected" event often arrives before the network really works, so a
+  // failed sync is retried a few times while reports are still waiting.
+  final List<Duration> retryDelays;
+
   final List<StreamSubscription<bool>> _subscriptions = [];
   bool _syncing = false;
 
@@ -27,7 +38,12 @@ class PendingReportSync {
     if (_syncing) return;
     _syncing = true;
     try {
-      await repository.syncPending();
+      var waiting = await repository.syncPending();
+      for (final delay in retryDelays) {
+        if (waiting == 0 || !await connectivity.isOnline()) break;
+        await Future<void>.delayed(delay);
+        waiting = await repository.syncPending();
+      }
     } finally {
       _syncing = false;
     }
