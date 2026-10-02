@@ -59,7 +59,7 @@ class FirestoreReportDataSource {
         description: data['description'] as String? ?? '',
         status: data['status'] as String? ?? 'reported',
         locationName: data['locationName'] as String?,
-        imageUrl: data['imageUrl'] as String?,
+        photoPath: data['photoPath'] as String?,
         reportedAt: (data['reportedAt'] as Timestamp?)?.toDate(),
       );
     }).toList();
@@ -70,7 +70,7 @@ class FirestoreReportDataSource {
   Future<void> createReport(
     String reportId,
     LostReportDraft draft, {
-    String? imageUrl,
+    String? photoPath,
   }) async {
     final uid = currentUid;
     final batch = _firestore.batch();
@@ -82,7 +82,7 @@ class FirestoreReportDataSource {
       'description': draft.description,
       'status': 'reported',
       'locationName': draft.locationName,
-      'imageUrl': ?imageUrl,
+      'photoPath': ?photoPath,
       'reportedAt': FieldValue.serverTimestamp(),
       'statusChangedAt': FieldValue.serverTimestamp(),
     });
