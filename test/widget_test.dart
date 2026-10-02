@@ -107,7 +107,10 @@ void main() {
     addTearDown(tester.view.resetPadding);
 
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.lightTheme, home: const HomeScreen()),
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: const HomeScreen(foundItemScreenBuilder: _foundItemForm),
+      ),
     );
 
     for (final text in [
@@ -123,13 +126,7 @@ void main() {
       expect(find.text(text), findsOneWidget);
     }
 
-    for (final text in [
-      'Search found items',
-      'I found an item',
-      'Search',
-      'Alerts',
-      'Profile',
-    ]) {
+    for (final text in ['Search found items', 'Search', 'Alerts', 'Profile']) {
       await tester.tap(find.text(text));
       await tester.pumpAndSettle();
       expect(find.byType(HomeScreen), findsOneWidget);
@@ -385,6 +382,19 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.text('Unable to sign out. Please try again.'), findsOneWidget);
   });
+
+  testWidgets('I found an item opens the found item form', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: HomeScreen(foundItemScreenBuilder: _foundItemForm),
+      ),
+    );
+
+    await tester.tap(find.text('I found an item'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Found item form'), findsOneWidget);
+  });
 }
 
 Future<void> _pumpLogin(
@@ -474,3 +484,6 @@ class _FakeBiometricService extends BiometricService {
     return pendingResult?.future ?? Future.value(authenticated);
   }
 }
+
+// Stands in for the Firebase-backed found item form in widget tests.
+Widget _foundItemForm(BuildContext context) => const Text('Found item form');

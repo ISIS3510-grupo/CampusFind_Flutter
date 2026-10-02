@@ -7,16 +7,24 @@ import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/widgets/home_action_card.dart';
 import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_screen.dart';
+import 'package:campusfind_flutter/views/report_item_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     this.authService = const AuthService(),
     this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
+    this.foundItemScreenBuilder = _defaultFoundItemScreen,
   });
 
   final AuthService authService;
   final FeatureUsageTracker featureUsageTracker;
+
+  // Screen opened by "I found an item"; tests replace it to avoid Firebase.
+  final WidgetBuilder foundItemScreenBuilder;
+
+  static Widget _defaultFoundItemScreen(BuildContext context) =>
+      const ReportItemScreen();
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -144,7 +152,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     HomeActionCard(
                       icon: Icons.search,
                       title: 'Search found items',
-                      subtitle: 'Check if something similar has already been registered.',
+                      subtitle:
+                          'Check if something similar has already been registered.',
                       large: true,
                       onTap: () => widget.featureUsageTracker.track(
                         AppFeature.searchFoundItems,
@@ -174,9 +183,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: 'I found an item',
                       subtitle: 'Report it and see where to deliver it.',
                       highlighted: true,
-                      onTap: () => widget.featureUsageTracker.track(
-                        AppFeature.reportFoundItem,
-                      ),
+                      onTap: () {
+                        widget.featureUsageTracker.track(
+                          AppFeature.reportFoundItem,
+                        );
+                        // Report screen with the GPS location of the item.
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: widget.foundItemScreenBuilder,
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 36),
                     const Text(
