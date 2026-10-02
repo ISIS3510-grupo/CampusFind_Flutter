@@ -15,7 +15,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> fillForm(WidgetTester tester) async {
+  Future<void> fillForm(WidgetTester tester, {bool withDetail = true}) async {
     // Picks the category first, while the dropdown is still on screen.
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
@@ -34,10 +34,12 @@ void main() {
       find.widgetWithText(TextFormField, 'Where did you lose it?'),
       'ML building',
     );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Detail'),
-      'Name on the back',
-    );
+    if (withDetail) {
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Detail'),
+        'Name on the back',
+      );
+    }
   }
 
   Future<void> tapSend(WidgetTester tester) async {
@@ -74,6 +76,19 @@ void main() {
     expect(draft.title, 'Calculator');
     expect(draft.category, 'electronics');
     expect(draft.privateVerificationDetail, 'Name on the back');
+  });
+
+  testWidgets('private detail is optional and stays null when empty', (
+    tester,
+  ) async {
+    final repository = FakeLostReportRepository();
+    await openScreen(tester, repository);
+
+    await fillForm(tester, withDetail: false);
+    await tapSend(tester);
+
+    expect(repository.submitted, hasLength(1));
+    expect(repository.submitted.single.privateVerificationDetail, isNull);
   });
 
   testWidgets('shows an error message when the repository fails', (
