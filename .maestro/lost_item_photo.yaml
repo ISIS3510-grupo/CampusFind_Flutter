@@ -1,0 +1,23 @@
+# Sensor: takes a photo with the camera and sends it with the lost report.
+# The photo goes to Storage (lostReports/{id}.jpg) and its path to photoPath.
+# Shutter and done ids are from the stock Android emulator camera app.
+appId: com.campusfind.flutter
+---
+- runFlow: login.yaml
+- runFlow: fill_lost_report.yaml
+- scrollUntilVisible:
+    element: "Take a photo \\(optional\\)"
+- tapOn: "Take a photo \\(optional\\)"
+- tapOn:
+    id: "com.android.camera2:id/shutter_button"
+- tapOn:
+    id: "com.android.camera2:id/done_button"
+- extendedWaitUntil:
+    visible: "Photo added"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Send report"
+- tapOn: "Send report"
+- extendedWaitUntil:
+    visible: "Report sent. We will let you know if we find it."
+    timeout: 30000

@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'package:campusfind_flutter/features/analytics/data/firestore_feature_usage_tracker.dart';
 import 'package:campusfind_flutter/features/analytics/domain/app_feature.dart';
 import 'package:campusfind_flutter/features/analytics/domain/feature_usage_tracker.dart';
 import 'package:campusfind_flutter/features/reports/data/lost_report_repository_impl.dart';
+import 'package:campusfind_flutter/features/reports/data/photo_picker.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report_repository.dart';
 import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_controller.dart';
@@ -13,11 +16,13 @@ class ReportLostItemScreen extends StatefulWidget {
     super.key,
     this.repository,
     this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
+    this.photoPicker = const CameraPhotoPicker(),
   });
 
   // Injected in tests; the app uses the Firestore implementation.
   final LostReportRepository? repository;
   final FeatureUsageTracker featureUsageTracker;
+  final PhotoPicker photoPicker;
 
   @override
   State<ReportLostItemScreen> createState() => _ReportLostItemScreenState();
@@ -34,6 +39,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
   final _location = TextEditingController();
   final _privateDetail = TextEditingController();
   String? _category;
+  String? _photoPath;
 
   late final ReportLostItemController _controller;
 
@@ -55,6 +61,18 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
     super.dispose();
   }
 
+  Future<void> _takePhoto() async {
+    try {
+      final path = await widget.photoPicker.takePhoto();
+      if (path != null && mounted) setState(() => _photoPath = path);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open the camera.')),
+      );
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -67,14 +85,21 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
         privateVerificationDetail: _privateDetail.text.trim().isEmpty
             ? null
             : _privateDetail.text.trim(),
+        imagePath: _photoPath,
       ),
     );
     if (!mounted || result == null) return;
     widget.featureUsageTracker.track(AppFeature.submitLostReport);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Report sent. We will let you know if we find it.'),
+      SnackBar(
+        content: Text(switch (result) {
+          SubmitResult(status: SubmitStatus.queuedOffline) =>
+            'No connection. Your report is saved and will be sent automatically.',
+          SubmitResult(photoFailed: true) =>
+            'Report sent. The photo will be uploaded when the connection improves.',
+          _ => 'Report sent. We will let you know if we find it.',
+        }),
       ),
     );
     Navigator.of(context).pop(result);
@@ -195,6 +220,53 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
                       hint: 'Name engraved on the back (optional)',
                     ),
                   ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Photo',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_photoPath == null)
+                    OutlinedButton.icon(
+                      onPressed: _controller.submitting ? null : _takePhoto,
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      label: const Text('Take a photo (optional)'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        side: const BorderSide(color: _border),
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            File(_photoPath!),
+                            width: 72,
+                            height: 72,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const SizedBox(
+                              width: 72,
+                              height: 72,
+                              child: Icon(Icons.image_outlined),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(child: Text('Photo added')),
+                        TextButton(
+                          onPressed: _controller.submitting
+                              ? null
+                              : () => setState(() => _photoPath = null),
+                          child: const Text('Remove'),
+                        ),
+                      ],
+                    ),
                   if (_controller.errorMessage != null) ...[
                     const SizedBox(height: 16),
                     Text(

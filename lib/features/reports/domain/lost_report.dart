@@ -70,8 +70,11 @@ class LostReport {
 enum SubmitStatus { submitted, queuedOffline }
 
 class SubmitResult {
-  const SubmitResult(this.reportId, this.status);
+  const SubmitResult(this.reportId, this.status, {this.photoFailed = false});
 
   final String reportId;
   final SubmitStatus status;
+
+  // True when the report was saved but its photo is still waiting to upload.
+  final bool photoFailed;
 }

@@ -1,0 +1,6 @@
+# Flows run by `maestro test .maestro`; login and fill_lost_report are subflows.
+flows:
+  - report_lost_item.yaml
+  - report_with_private_detail.yaml
+  - lost_item_photo.yaml
+  - offline_queue.yaml

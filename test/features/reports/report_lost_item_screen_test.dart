@@ -3,14 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_lost_report_repository.dart';
+import 'fake_photo_picker.dart';
 
 void main() {
   Future<void> openScreen(
     WidgetTester tester,
-    FakeLostReportRepository repository,
-  ) async {
+    FakeLostReportRepository repository, {
+    FakePhotoPicker? photoPicker,
+  }) async {
     await tester.pumpWidget(
-      MaterialApp(home: ReportLostItemScreen(repository: repository)),
+      MaterialApp(
+        home: ReportLostItemScreen(
+          repository: repository,
+          photoPicker: photoPicker ?? FakePhotoPicker(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
   }
@@ -89,6 +96,132 @@ void main() {
 
     expect(repository.submitted, hasLength(1));
     expect(repository.submitted.single.privateVerificationDetail, isNull);
+  });
+
+  Future<void> tapTakePhoto(WidgetTester tester) async {
+    final button = find.text('Take a photo (optional)');
+    await tester.scrollUntilVisible(
+      button,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('sends the photo taken with the camera', (tester) async {
+    final repository = FakeLostReportRepository();
+    final picker = FakePhotoPicker();
+    await openScreen(tester, repository, photoPicker: picker);
+
+    await fillForm(tester);
+    await tapTakePhoto(tester);
+    expect(picker.calls, 1);
+    expect(find.text('Photo added'), findsOneWidget);
+
+    await tapSend(tester);
+
+    expect(repository.submitted.single.imagePath, '/photos/calculator.jpg');
+  });
+
+  testWidgets('a removed or cancelled photo is not sent', (tester) async {
+    final repository = FakeLostReportRepository();
+    await openScreen(tester, repository);
+
+    await fillForm(tester);
+    await tapTakePhoto(tester);
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+    expect(find.text('Take a photo (optional)'), findsOneWidget);
+
+    await tapSend(tester);
+    expect(repository.submitted.single.imagePath, isNull);
+  });
+
+  testWidgets('cancelling the camera keeps the form without a photo', (
+    tester,
+  ) async {
+    final repository = FakeLostReportRepository();
+    await openScreen(
+      tester,
+      repository,
+      photoPicker: FakePhotoPicker(path: null),
+    );
+
+    await tapTakePhoto(tester);
+
+    expect(find.text('Photo added'), findsNothing);
+    expect(find.text('Take a photo (optional)'), findsOneWidget);
+  });
+
+  testWidgets('tells the student when only the photo failed', (tester) async {
+    final repository = FakeLostReportRepository(photoFailed: true);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ReportLostItemScreen(
+                    repository: repository,
+                    photoPicker: FakePhotoPicker(),
+                  ),
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await fillForm(tester);
+    await tapTakePhoto(tester);
+    await tapSend(tester);
+
+    expect(
+      find.text(
+        'Report sent. The photo will be uploaded when the connection improves.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('tells the student the report waits for the connection', (
+    tester,
+  ) async {
+    final repository = FakeLostReportRepository(offline: true);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ReportLostItemScreen(repository: repository),
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await fillForm(tester);
+    await tapSend(tester);
+
+    expect(
+      find.text(
+        'No connection. Your report is saved and will be sent automatically.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shows an error message when the repository fails', (
