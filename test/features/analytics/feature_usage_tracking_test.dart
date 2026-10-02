@@ -19,12 +19,19 @@ void main() {
   testWidgets('Home records which action the student uses', (tester) async {
     final tracker = FakeFeatureUsageTracker();
     await tester.pumpWidget(
-      MaterialApp(home: HomeScreen(featureUsageTracker: tracker)),
+      MaterialApp(
+        home: HomeScreen(
+          featureUsageTracker: tracker,
+          foundItemScreenBuilder: (_) => const Text('Found item form'),
+        ),
+      ),
     );
 
     await tester.tap(find.text('Search found items'));
     await tester.tap(find.text('I found an item'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Found item form'), findsOneWidget);
 
     expect(tracker.tracked, [
       AppFeature.searchFoundItems,

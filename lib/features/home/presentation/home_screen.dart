@@ -1,10 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../views/report_item_screen.dart';
-import '../../auth/data/auth_service.dart';
-import '../../auth/presentation/login_screen.dart';
-import '../../auth/data/auth_service.dart';
-import '../../auth/presentation/login_screen.dart';
-import '../../../views/notification_screen.dart';
+
 import 'package:campusfind_flutter/features/analytics/data/firestore_feature_usage_tracker.dart';
 import 'package:campusfind_flutter/features/analytics/domain/app_feature.dart';
 import 'package:campusfind_flutter/features/analytics/domain/feature_usage_tracker.dart';
@@ -12,16 +7,25 @@ import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/widgets/home_action_card.dart';
 import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_screen.dart';
+import 'package:campusfind_flutter/views/notification_screen.dart';
+import 'package:campusfind_flutter/views/report_item_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     this.authService = const AuthService(),
     this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
+    this.foundItemScreenBuilder = _defaultFoundItemScreen,
   });
 
   final AuthService authService;
   final FeatureUsageTracker featureUsageTracker;
+
+  // Screen opened by "I found an item"; tests replace it to avoid Firebase.
+  final WidgetBuilder foundItemScreenBuilder;
+
+  static Widget _defaultFoundItemScreen(BuildContext context) =>
+      const ReportItemScreen();
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -29,47 +33,33 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _signingOut = false;
-  int _currentIndex = 0;
-  String _statusMessage = 'Pantalla principal cargada';
 
-  // Cierre de sesión directo y controlado con banderas de estado simples
-  void _signOut() {
+  Future<void> _signOut() async {
     if (_signingOut) return;
     setState(() => _signingOut = true);
 
-    // Llamada sincrónica/directa sin esperar bloques complejos de red si no se requiere
-    widget.authService.signOut();
+    try {
+      await widget.authService.signOut();
+      if (!mounted) return;
 
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (context) => LoginScreen(authService: widget.authService),
-      ),
-      (route) => false,
-    );
-  }
-
-  void _onTabTapped(int index) {
-    if (index == 2) {
-      // Si el usuario presiona la pestaña de "Alerts" (índice 2)
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const NotificationsScreen(),
+      // Removes Home so the back button cannot reopen the signed-out session.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (context) => LoginScreen(authService: widget.authService),
         ),
+        (route) => false,
       );
-      return;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to sign out. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
     }
-
-    if (_currentIndex == index) return;
-    setState(() {
-      _currentIndex = index;
-    });
-  }
-
-  void _actualizarEstado() {
-    setState(() {
-      _statusMessage = 'Estado actualizado localmente';
-    });
   }
 
   @override
@@ -82,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Encabezado institucional amarillo de Figma
+              // Yellow header from the Figma design
               Container(
                 height: 92,
                 color: const Color(0xFFFEFD05),
@@ -160,132 +150,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    
-                    // Tarjeta de búsqueda
-                    Material(
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        side: const BorderSide(color: Color(0xFFE2DEDE)),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: InkWell(
-                        onTap: () {
-                          // Acción de búsqueda
-                        },
-                        borderRadius: BorderRadius.circular(10),
-                        child: const SizedBox(
-                          height: 122,
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(24, 22, 24, 0),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: EdgeInsets.only(top: 3),
-                                  child: Icon(
-                                    Icons.search,
-                                    size: 31,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                SizedBox(width: 23),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Search found items',
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.black,
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                      SizedBox(height: 10),
-                                      Text(
-                                        'Check if something similar has already been registered.',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w300,
-                                          color: Color(0xFF999798),
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Tarjeta "I found an item"
-                    Material(
-                      color: const Color(0xFFFEFD05),
-                      borderRadius: BorderRadius.circular(10),
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ReportItemScreen(),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(10),
-                        child: const SizedBox(
-                          height: 104,
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(24, 20, 20, 0),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: EdgeInsets.only(top: 5),
-                                  child: Icon(
-                                    Icons.add,
-                                    size: 28,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                SizedBox(width: 20),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'I found an item',
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.black,
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                      SizedBox(height: 10),
-                                      Text(
-                                        'Report it and see where to deliver it.',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w300,
-                                          color: Colors.black,
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
                     HomeActionCard(
                       icon: Icons.search,
                       title: 'Search found items',
-                      subtitle: 'Check if something similar has already been registered.',
+                      subtitle:
+                          'Check if something similar has already been registered.',
                       large: true,
                       onTap: () => widget.featureUsageTracker.track(
                         AppFeature.searchFoundItems,
@@ -315,39 +184,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: 'I found an item',
                       subtitle: 'Report it and see where to deliver it.',
                       highlighted: true,
-                      onTap: () => widget.featureUsageTracker.track(
-                        AppFeature.reportFoundItem,
-                      ),
+                      onTap: () {
+                        widget.featureUsageTracker.track(
+                          AppFeature.reportFoundItem,
+                        );
+                        // Report screen with the GPS location of the item.
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: widget.foundItemScreenBuilder,
+                          ),
+                        );
+                      },
                     ),
-                    const SizedBox(height: 24),
-
-                    // Botón tradicional para refrescar estado en la interfaz
-                    OutlinedButton.icon(
-                      onPressed: _actualizarEstado,
-                      icon: const Icon(Icons.refresh, color: Colors.black),
-                      label: const Text(
-                        'Actualizar estado en pantalla',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFE2DEDE)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _statusMessage,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF999798),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 36),
                     const Text(
                       'My active report',
                       style: TextStyle(
@@ -358,6 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 13),
+                    // Temporary UI data; the report team will connect this later.
                     Container(
                       height: 116,
                       padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
@@ -448,8 +298,17 @@ class _HomeScreenState extends State<HomeScreen> {
           child: SizedBox(
             height: 61,
             child: BottomNavigationBar(
-              currentIndex: _currentIndex,
-              onTap: _onTabTapped,
+              currentIndex: 0,
+              onTap: (index) {
+                // Alerts tab: notifications sent by the backend.
+                if (index == 2) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  );
+                }
+              },
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
               elevation: 0,
