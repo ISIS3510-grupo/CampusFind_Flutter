@@ -9,34 +9,34 @@ void main() {
   setUpAll(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-      const MethodChannel('plugins.flutter.io/firebase_core'),
-      (MethodCall methodCall) async {
-        if (methodCall.method == 'Firebase#initializeCore') {
-          return [
-            {
-              'name': '[DEFAULT]',
-              'options': {
-                'apiKey': 'fake',
-                'appId': 'fake',
-                'messagingSenderId': 'fake',
-                'projectId': 'fake',
-              },
-              'pluginConstants': {},
+          const MethodChannel('plugins.flutter.io/firebase_core'),
+          (MethodCall methodCall) async {
+            if (methodCall.method == 'Firebase#initializeCore') {
+              return [
+                {
+                  'name': '[DEFAULT]',
+                  'options': {
+                    'apiKey': 'fake',
+                    'appId': 'fake',
+                    'messagingSenderId': 'fake',
+                    'projectId': 'fake',
+                  },
+                  'pluginConstants': {},
+                },
+              ];
             }
-          ];
-        }
 
-        if (methodCall.method == 'Firebase#initializeApp') {
-          return {
-            'name': methodCall.arguments['appName'],
-            'options': methodCall.arguments['options'],
-            'pluginConstants': {},
-          };
-        }
+            if (methodCall.method == 'Firebase#initializeApp') {
+              return {
+                'name': methodCall.arguments['appName'],
+                'options': methodCall.arguments['options'],
+                'pluginConstants': {},
+              };
+            }
 
-        return null;
-      },
-    );
+            return null;
+          },
+        );
   });
 
   group('ItemModel Unit Tests', () {
