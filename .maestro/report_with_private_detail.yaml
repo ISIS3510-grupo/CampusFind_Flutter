@@ -1,0 +1,17 @@
+# Report with the optional private verification detail: creates the report and
+# its lostReportPrivate document in the same batch.
+appId: com.campusfind.flutter
+---
+- runFlow: login.yaml
+- runFlow: fill_lost_report.yaml
+- scrollUntilVisible:
+    element: "Detail"
+- tapOn: "Detail"
+- inputText: "Name engraved on the back"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Send report"
+- tapOn: "Send report"
+- extendedWaitUntil:
+    visible: "Report sent. We will let you know if we find it."
+    timeout: 20000

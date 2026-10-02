@@ -1,0 +1,19 @@
+# Subflow: opens "I lost an item" and fills the required fields.
+# TITLE identifies the report so it can be checked in Firestore afterwards.
+appId: com.campusfind.flutter
+---
+- tapOn: "I lost an item.*"
+- extendedWaitUntil:
+    visible: "Tell us what you lost"
+    timeout: 10000
+- tapOn: "Item"
+- inputText: ${TITLE}
+- hideKeyboard
+- tapOn: "Category"
+- tapOn: "Electronics"
+- tapOn: "Description"
+- inputText: "Black casio, sticker on the back"
+- hideKeyboard
+- tapOn: "Where did you lose it?"
+- inputText: "ML building, 5th floor"
+- hideKeyboard
