@@ -127,7 +127,6 @@ void main() {
     }
 
     for (final text in ['Search found items', 'Search', 'Profile']) {
-    for (final text in ['Search found items', 'Search', 'Alerts', 'Profile']) {
       await tester.tap(find.text(text));
       await tester.pumpAndSettle();
       expect(find.byType(HomeScreen), findsOneWidget);
