@@ -5,7 +5,7 @@ class LostReportDraft {
     required this.category,
     required this.description,
     required this.locationName,
-    required this.privateVerificationDetail,
+    this.privateVerificationDetail,
     this.imagePath,
   });
 
@@ -14,8 +14,9 @@ class LostReportDraft {
   final String description;
   final String locationName;
 
-  // Only the owner and the admin can read it (lostReportPrivate).
-  final String privateVerificationDetail;
+  // Optional. Only the owner and the admin can read it (lostReportPrivate).
+  // Null when the student leaves it empty, so no private doc is created.
+  final String? privateVerificationDetail;
 
   // Local path of the photo taken with the camera, if any.
   final String? imagePath;
@@ -35,7 +36,7 @@ class LostReportDraft {
       category: json['category'] as String,
       description: json['description'] as String,
       locationName: json['locationName'] as String,
-      privateVerificationDetail: json['privateVerificationDetail'] as String,
+      privateVerificationDetail: json['privateVerificationDetail'] as String?,
       imagePath: json['imagePath'] as String?,
     );
   }

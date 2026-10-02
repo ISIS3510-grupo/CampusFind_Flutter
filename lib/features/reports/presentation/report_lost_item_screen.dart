@@ -64,7 +64,9 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
         category: _category!,
         description: _description.text.trim(),
         locationName: _location.text.trim(),
-        privateVerificationDetail: _privateDetail.text.trim(),
+        privateVerificationDetail: _privateDetail.text.trim().isEmpty
+            ? null
+            : _privateDetail.text.trim(),
       ),
     );
     if (!mounted || result == null) return;
@@ -190,9 +192,8 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
                     controller: _privateDetail,
                     decoration: _decoration(
                       'Detail',
-                      hint: 'Name engraved on the back',
+                      hint: 'Name engraved on the back (optional)',
                     ),
-                    validator: _required,
                   ),
                   if (_controller.errorMessage != null) ...[
                     const SizedBox(height: 16),

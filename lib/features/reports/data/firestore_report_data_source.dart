@@ -65,8 +65,8 @@ class FirestoreReportDataSource {
     }).toList();
   }
 
-  // The public report and its private detail are written in one batch: the
-  // security rules check that the report exists when the private doc is created.
+  // The public report and its optional private detail are written in one batch:
+  // the security rules check that the report exists when the private doc is created.
   Future<void> createReport(
     String reportId,
     LostReportDraft draft, {
@@ -87,10 +87,13 @@ class FirestoreReportDataSource {
       'statusChangedAt': FieldValue.serverTimestamp(),
     });
 
-    batch.set(_firestore.collection('lostReportPrivate').doc(reportId), {
-      'ownerUid': uid,
-      'privateVerificationDetail': draft.privateVerificationDetail,
-    });
+    final privateDetail = draft.privateVerificationDetail;
+    if (privateDetail != null) {
+      batch.set(_firestore.collection('lostReportPrivate').doc(reportId), {
+        'ownerUid': uid,
+        'privateVerificationDetail': privateDetail,
+      });
+    }
 
     await batch.commit();
   }
