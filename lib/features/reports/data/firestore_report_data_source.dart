@@ -97,4 +97,11 @@ class FirestoreReportDataSource {
 
     await batch.commit();
   }
+
+  // The owner adds the photo after the upload, so Storage could check the owner.
+  Future<void> attachPhoto(String reportId, String photoPath) {
+    return _firestore.collection('lostReports').doc(reportId).update({
+      'photoPath': photoPath,
+    });
+  }
 }
