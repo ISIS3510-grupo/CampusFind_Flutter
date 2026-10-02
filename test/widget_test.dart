@@ -126,7 +126,7 @@ void main() {
       expect(find.text(text), findsOneWidget);
     }
 
-    for (final text in ['Search found items', 'Search', 'Alerts', 'Profile']) {
+    for (final text in ['Search found items', 'Search', 'Profile']) {
       await tester.tap(find.text(text));
       await tester.pumpAndSettle();
       expect(find.byType(HomeScreen), findsOneWidget);

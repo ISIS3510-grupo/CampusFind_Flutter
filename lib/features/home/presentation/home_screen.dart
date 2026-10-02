@@ -7,6 +7,7 @@ import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/widgets/home_action_card.dart';
 import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_screen.dart';
+import 'package:campusfind_flutter/views/notification_screen.dart';
 import 'package:campusfind_flutter/views/report_item_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -298,7 +299,16 @@ class _HomeScreenState extends State<HomeScreen> {
             height: 61,
             child: BottomNavigationBar(
               currentIndex: 0,
-              onTap: (_) {},
+              onTap: (index) {
+                // Alerts tab: notifications sent by the backend.
+                if (index == 2) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  );
+                }
+              },
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
               elevation: 0,
