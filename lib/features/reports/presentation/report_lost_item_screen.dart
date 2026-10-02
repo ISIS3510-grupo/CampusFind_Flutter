@@ -93,11 +93,13 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          result.photoFailed
-              ? 'Report sent, but the photo could not be uploaded.'
-              : 'Report sent. We will let you know if we find it.',
-        ),
+        content: Text(switch (result) {
+          SubmitResult(status: SubmitStatus.queuedOffline) =>
+            'No connection. Your report is saved and will be sent automatically.',
+          SubmitResult(photoFailed: true) =>
+            'Report sent. The photo will be uploaded when the connection improves.',
+          _ => 'Report sent. We will let you know if we find it.',
+        }),
       ),
     );
     Navigator.of(context).pop(result);

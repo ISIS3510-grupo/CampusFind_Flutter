@@ -98,6 +98,13 @@ class FirestoreReportDataSource {
     await batch.commit();
   }
 
+  // Uses the local cache too, so a report still waiting in Firestore's own
+  // offline queue is not created twice.
+  Future<bool> reportExists(String reportId) async {
+    final doc = await _firestore.collection('lostReports').doc(reportId).get();
+    return doc.exists;
+  }
+
   // The owner adds the photo after the upload, so Storage could check the owner.
   Future<void> attachPhoto(String reportId, String photoPath) {
     return _firestore.collection('lostReports').doc(reportId).update({

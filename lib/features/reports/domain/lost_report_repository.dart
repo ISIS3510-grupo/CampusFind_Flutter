@@ -8,4 +8,7 @@ abstract class LostReportRepository {
   Future<List<LostReport>> getMyActiveReports();
 
   Future<SubmitResult> submit(LostReportDraft draft);
+
+  // Sends the reports saved while offline. Returns how many were sent.
+  Future<int> syncPending();
 }

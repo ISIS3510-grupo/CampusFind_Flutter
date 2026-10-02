@@ -75,6 +75,6 @@ class SubmitResult {
   final String reportId;
   final SubmitStatus status;
 
-  // True when the report was saved but its photo could not be uploaded.
+  // True when the report was saved but its photo is still waiting to upload.
   final bool photoFailed;
 }

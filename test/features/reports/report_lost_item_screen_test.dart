@@ -183,7 +183,43 @@ void main() {
     await tapSend(tester);
 
     expect(
-      find.text('Report sent, but the photo could not be uploaded.'),
+      find.text(
+        'Report sent. The photo will be uploaded when the connection improves.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('tells the student the report waits for the connection', (
+    tester,
+  ) async {
+    final repository = FakeLostReportRepository(offline: true);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ReportLostItemScreen(repository: repository),
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await fillForm(tester);
+    await tapSend(tester);
+
+    expect(
+      find.text(
+        'No connection. Your report is saved and will be sent automatically.',
+      ),
       findsOneWidget,
     );
   });

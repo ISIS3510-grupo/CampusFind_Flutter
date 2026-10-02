@@ -6,11 +6,14 @@ class FakeLostReportRepository implements LostReportRepository {
     this.activeReports = const [],
     this.failSubmit = false,
     this.photoFailed = false,
+    this.offline = false,
   });
 
   final List<LostReport> activeReports;
   final bool failSubmit;
   final bool photoFailed;
+  final bool offline;
+  int syncCalls = 0;
   final List<LostReportDraft> submitted = [];
 
   @override
@@ -25,8 +28,14 @@ class FakeLostReportRepository implements LostReportRepository {
     submitted.add(draft);
     return SubmitResult(
       'report-${submitted.length}',
-      SubmitStatus.submitted,
+      offline ? SubmitStatus.queuedOffline : SubmitStatus.submitted,
       photoFailed: photoFailed,
     );
+  }
+
+  @override
+  Future<int> syncPending() async {
+    syncCalls++;
+    return 0;
   }
 }
