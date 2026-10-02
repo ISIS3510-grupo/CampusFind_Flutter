@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../views/report_item_screen.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
+import '../../auth/data/auth_service.dart';
+import '../../auth/presentation/login_screen.dart';
+import '../../../views/notification_screen.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -15,33 +18,47 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _signingOut = false;
+  int _currentIndex = 0;
+  String _statusMessage = 'Pantalla principal cargada';
 
-  Future<void> _signOut() async {
+  // Cierre de sesión directo y controlado con banderas de estado simples
+  void _signOut() {
     if (_signingOut) return;
     setState(() => _signingOut = true);
 
-    try {
-      await widget.authService.signOut();
-      if (!mounted) return;
+    // Llamada sincrónica/directa sin esperar bloques complejos de red si no se requiere
+    widget.authService.signOut();
 
-      // Removes Home so the back button cannot reopen the signed-out session.
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(
-          builder: (context) => LoginScreen(authService: widget.authService),
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (context) => LoginScreen(authService: widget.authService),
+      ),
+      (route) => false,
+    );
+  }
+
+  void _onTabTapped(int index) {
+    if (index == 2) {
+      // Si el usuario presiona la pestaña de "Alerts" (índice 2)
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const NotificationsScreen(),
         ),
-        (route) => false,
       );
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to sign out. Please try again.'),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _signingOut = false);
+      return;
     }
+
+    if (_currentIndex == index) return;
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  void _actualizarEstado() {
+    setState(() {
+      _statusMessage = 'Estado actualizado localmente';
+    });
   }
 
   @override
@@ -54,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Yellow header from the Figma design
+              // Encabezado institucional amarillo de Figma
               Container(
                 height: 92,
                 color: const Color(0xFFFEFD05),
@@ -132,6 +149,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
+                    
+                    // Tarjeta de búsqueda
                     Material(
                       color: Colors.white,
                       shape: RoundedRectangleBorder(
@@ -140,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: InkWell(
                         onTap: () {
-                          // 
+                          // Acción de búsqueda
                         },
                         borderRadius: BorderRadius.circular(10),
                         child: const SizedBox(
@@ -193,12 +212,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+
+                    // Tarjeta "I found an item"
                     Material(
                       color: const Color(0xFFFEFD05),
                       borderRadius: BorderRadius.circular(10),
                       child: InkWell(
                         onTap: () {
-                          // Navegación hacia la pantalla de reporte con ubicación GPS
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -256,7 +276,35 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 24),
+
+                    // Botón tradicional para refrescar estado en la interfaz
+                    OutlinedButton.icon(
+                      onPressed: _actualizarEstado,
+                      icon: const Icon(Icons.refresh, color: Colors.black),
+                      label: const Text(
+                        'Actualizar estado en pantalla',
+                        style: TextStyle(color: Colors.black),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFE2DEDE)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _statusMessage,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF999798),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: 28),
                     const Text(
                       'My active report',
                       style: TextStyle(
@@ -267,7 +315,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 13),
-                    // Temporary UI data; the report team will connect this later.
                     Container(
                       height: 116,
                       padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
@@ -358,8 +405,8 @@ class _HomeScreenState extends State<HomeScreen> {
           child: SizedBox(
             height: 61,
             child: BottomNavigationBar(
-              currentIndex: 0,
-              onTap: (_) {},
+              currentIndex: _currentIndex,
+              onTap: _onTabTapped,
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
               elevation: 0,
