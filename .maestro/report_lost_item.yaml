@@ -1,0 +1,12 @@
+# Sends a lost report without photo and without the optional private detail.
+appId: com.campusfind.flutter
+---
+- runFlow: login.yaml
+- runFlow: fill_lost_report.yaml
+- scrollUntilVisible:
+    element: "Send report"
+- tapOn: "Send report"
+- extendedWaitUntil:
+    visible: "Report sent. We will let you know if we find it."
+    timeout: 20000
+- assertVisible: "What do you need?"

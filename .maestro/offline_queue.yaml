@@ -1,0 +1,19 @@
+# Connectivity-aware submission: without network the report is queued on the
+# device and sent automatically when the connection returns.
+appId: com.campusfind.flutter
+---
+- runFlow: login.yaml
+- setAirplaneMode: enabled
+- runFlow: fill_lost_report.yaml
+- scrollUntilVisible:
+    element: "Send report"
+- tapOn: "Send report"
+- extendedWaitUntil:
+    visible: "No connection. Your report is saved and will be sent automatically."
+    timeout: 20000
+- assertVisible: "What do you need?"
+- setAirplaneMode: disabled
+# Gives the sync time to send the queue once the network is back.
+- waitForAnimationToEnd:
+    timeout: 15000
+- takeScreenshot: offline_queue_after_reconnect

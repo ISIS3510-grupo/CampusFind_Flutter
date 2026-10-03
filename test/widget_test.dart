@@ -1,45 +1,27 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:campusfind_flutter/app/campus_find_app.dart';
+import 'package:campusfind_flutter/core/data/lost_report_repository.dart';
 import 'package:campusfind_flutter/core/theme/app_theme.dart';
-import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
-import 'package:campusfind_flutter/features/auth/data/biometric_service.dart';
+import 'package:campusfind_flutter/features/auth/viewmodel/auth_view_model.dart';
+
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
+import 'package:campusfind_flutter/viewmodels/item_viewmodel.dart';
+import 'package:campusfind_flutter/views/report_item_screen.dart';
+import 'package:campusfind_flutter/services/location_service.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+
+import 'support/auth_fakes.dart';
+import 'support/firestore_fakes.dart';
+import 'support/test_fonts.dart';
 
 void main() {
-  setUpAll(() async {
-    // Uses the SDK font so text has normal Android dimensions in tests.
-    final packageConfig = File('.dart_tool/package_config.json');
-    final packages =
-        jsonDecode(await packageConfig.readAsString())['packages'] as List;
-    final flutterPackage = packages.firstWhere(
-      (package) => package['name'] == 'flutter',
-    );
-    final flutterRoot = packageConfig.uri.resolve(
-      '${flutterPackage['rootUri']}/',
-    );
-    for (final font in {
-      'Roboto': 'Roboto-Regular.ttf',
-      'MaterialIcons': 'MaterialIcons-Regular.otf',
-    }.entries) {
-      final fontFile = File.fromUri(
-        flutterRoot.resolve(
-          '../../bin/cache/artifacts/material_fonts/${font.value}',
-        ),
-      );
-      final fontLoader = FontLoader(font.key);
-      fontLoader.addFont(
-        fontFile.readAsBytes().then((bytes) => ByteData.sublistView(bytes)),
-      );
-      await fontLoader.load();
-    }
-  });
+  setUpAll(loadTestFonts);
 
   testWidgets('Login screen displays the access options', (
     WidgetTester tester,
@@ -55,8 +37,8 @@ void main() {
     expect(find.text('Enter with Uniandes'), findsOneWidget);
     expect(find.text('Staff access'), findsOneWidget);
 
-    final auth = _FakeAuthService();
-    final biometrics = _FakeBiometricService();
+    final auth = FakeAuthService();
+    final biometrics = FakeBiometricService();
     await _pumpLogin(tester, auth, biometrics);
     await tester.tap(find.text('Enter with Uniandes'));
     await tester.pumpAndSettle();
@@ -82,6 +64,9 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
     await tester.tap(find.text('Staff access'));
     await tester.pumpAndSettle();
+    expect(find.text('Staff sign in'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Lost & Found'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -96,63 +81,83 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Home displays the S02 content and inactive navigation', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    tester.view.padding = const FakeViewPadding(top: 42);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetPadding);
+  testWidgets(
+    'Home opens found reporting and preserves the other inactive actions',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      tester.view.padding = const FakeViewPadding(top: 42);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPadding);
 
-    await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.lightTheme, home: const HomeScreen()),
-    );
-
-    for (final text in [
-      'Lost & Found',
-      'What do you need?',
-      'Search found items',
-      'I found an item',
-      'My active report',
-      'Scientific calculator',
-      'Lost in ML · 2 days ago',
-      'Possible match',
-    ]) {
-      expect(find.text(text), findsOneWidget);
-    }
-
-    for (final text in [
-      'Search found items',
-      'I found an item',
-      'Search',
-      'Alerts',
-      'Profile',
-    ]) {
-      await tester.tap(find.text(text));
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => ItemViewModel(locationService: _NoGpsLocation()),
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: HomeScreen(
+              authService: FakeAuthService(savedSession: true),
+              lostReportRepository: LostReportRepository(
+                firestore: FakeFirestore(),
+              ),
+            ),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
-      expect(find.byType(HomeScreen), findsOneWidget);
+
+      for (final text in [
+        'Lost & Found',
+        'What do you need?',
+        'Search found items',
+        'I found an item',
+      ]) {
+        expect(find.text(text), findsOneWidget);
+      }
+      expect(find.text('My active report'), findsNothing);
+      expect(find.text('Scientific calculator'), findsNothing);
+      expect(find.text('Possible match'), findsNothing);
+
+      await tester.tap(find.text('I found an item'));
+      await tester.pumpAndSettle();
       expect(
         tester
-            .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
-            .currentIndex,
-        0,
+            .widget<ReportItemScreen>(find.byType(ReportItemScreen))
+            .reportType,
+        'found',
       );
-    }
-    expect(tester.takeException(), isNull);
+      expect(find.text('Report Found Item'), findsOneWidget);
+      expect(find.byType(TextFormField), findsNWidgets(3));
+      expect(find.text('Correo Uniandes'), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
-    tester.view.physicalSize = const Size(360, 640);
-    await tester.pumpAndSettle();
-    expect(find.text('My active report'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      for (final text in ['Search found items', 'Home', 'Search']) {
+        await tester.tap(find.text(text));
+        await tester.pumpAndSettle();
+        expect(find.byType(HomeScreen), findsOneWidget);
+        expect(
+          tester
+              .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
+              .currentIndex,
+          0,
+        );
+      }
+      expect(tester.takeException(), isNull);
+
+      tester.view.physicalSize = const Size(360, 640);
+      await tester.pumpAndSettle();
+      expect(find.text('My active report'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('Saved student session opens Home after biometric success', (
     tester,
   ) async {
-    final auth = _FakeAuthService(savedSession: true);
-    final biometrics = _FakeBiometricService();
+    final auth = FakeAuthService(savedSession: true);
+    final biometrics = FakeBiometricService();
     await _pumpLogin(tester, auth, biometrics);
 
     await tester.tap(find.text('Enter with Uniandes'));
@@ -168,8 +173,8 @@ void main() {
   testWidgets(
     'Biometric false opens password login without role checks or navigation',
     (tester) async {
-      final auth = _FakeAuthService(savedSession: true);
-      final biometrics = _FakeBiometricService(authenticated: false);
+      final auth = FakeAuthService(savedSession: true);
+      final biometrics = FakeBiometricService(authenticated: false);
       await _pumpLogin(tester, auth, biometrics);
 
       await tester.tap(find.text('Enter with Uniandes'));
@@ -184,13 +189,20 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(biometrics.authenticationCalls, 1);
 
-      await tester.enterText(
-        find.byType(TextField).first,
-        'student@example.com',
+      // Ingresar correo y contraseña en el diálogo de inicio de sesión
+      final textFields = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
       );
-      await tester.enterText(find.byType(TextField).last, 'test-password');
+
+      await tester.enterText(textFields.at(0), 'estudiante@uniandes.edu.co');
+      await tester.pump();
+      await tester.enterText(textFields.at(1), 'Password123!');
+      await tester.pump();
+
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
+
       expect(auth.passwordCalls, 1);
       expect(auth.roleChecks, 1);
       expect(find.byType(HomeScreen), findsOneWidget);
@@ -200,8 +212,8 @@ void main() {
   testWidgets('Unavailable biometrics fall back to the password dialog', (
     tester,
   ) async {
-    final auth = _FakeAuthService(savedSession: true);
-    final biometrics = _FakeBiometricService(available: false);
+    final auth = FakeAuthService(savedSession: true);
+    final biometrics = FakeBiometricService(available: false);
     await _pumpLogin(tester, auth, biometrics);
 
     await tester.tap(find.text('Enter with Uniandes'));
@@ -219,11 +231,11 @@ void main() {
   testWidgets('Biometric success cannot bypass a rejected student role', (
     tester,
   ) async {
-    final auth = _FakeAuthService(
+    final auth = FakeAuthService(
       savedSession: true,
       roleError: 'This account does not have student access.',
     );
-    await _pumpLogin(tester, auth, _FakeBiometricService());
+    await _pumpLogin(tester, auth, FakeBiometricService());
 
     await tester.tap(find.text('Enter with Uniandes'));
     await tester.pumpAndSettle();
@@ -243,8 +255,8 @@ void main() {
     tester,
   ) async {
     final result = Completer<bool>();
-    final auth = _FakeAuthService(savedSession: true);
-    final biometrics = _FakeBiometricService(pendingResult: result);
+    final auth = FakeAuthService(savedSession: true);
+    final biometrics = FakeBiometricService(pendingResult: result);
     await _pumpLogin(tester, auth, biometrics);
 
     await tester.tap(find.text('Enter with Uniandes'));
@@ -265,8 +277,8 @@ void main() {
   testWidgets(
     'Biometric exception opens password login and keeps the session',
     (tester) async {
-      final auth = _FakeAuthService(savedSession: true);
-      final biometrics = _FakeBiometricService(
+      final auth = FakeAuthService(savedSession: true);
+      final biometrics = FakeBiometricService(
         authenticationError: PlatformException(
           code: 'authentication_cancelled',
         ),
@@ -295,23 +307,29 @@ void main() {
   testWidgets(
     'Rejected fallback password cannot use the saved session to enter Home',
     (tester) async {
-      final auth = _FakeAuthService(
+      final auth = FakeAuthService(
         savedSession: true,
         passwordError: 'Incorrect email or password. Please try again.',
       );
       await _pumpLogin(
         tester,
         auth,
-        _FakeBiometricService(authenticated: false),
+        FakeBiometricService(authenticated: false),
       );
 
       await tester.tap(find.text('Enter with Uniandes'));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byType(TextField).first,
-        'student@example.com',
+
+      final textFields = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
       );
-      await tester.enterText(find.byType(TextField).last, 'wrong-password');
+
+      await tester.enterText(textFields.at(0), 'estudiante@uniandes.edu.co');
+      await tester.pump();
+      await tester.enterText(textFields.at(1), 'wrong-password');
+      await tester.pump();
+
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
 
@@ -325,12 +343,11 @@ void main() {
       expect(auth.hasCurrentUser, isTrue);
     },
   );
-
   testWidgets(
     'Home arrow signs out, clears the stack, and restores password login',
     (tester) async {
-      final auth = _FakeAuthService(savedSession: true);
-      final biometrics = _FakeBiometricService();
+      final auth = FakeAuthService(savedSession: true);
+      final biometrics = FakeBiometricService();
       await _pumpLogin(tester, auth, biometrics);
       await tester.tap(find.text('Enter with Uniandes'));
       await tester.pumpAndSettle();
@@ -361,8 +378,8 @@ void main() {
   testWidgets('Failed sign-out keeps Home open and reports the error', (
     tester,
   ) async {
-    final auth = _FakeAuthService(savedSession: true, failSignOut: true);
-    await _pumpLogin(tester, auth, _FakeBiometricService());
+    final auth = FakeAuthService(savedSession: true, failSignOut: true);
+    await _pumpLogin(tester, auth, FakeBiometricService());
     await tester.tap(find.text('Enter with Uniandes'));
     await tester.pumpAndSettle();
 
@@ -373,92 +390,65 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.text('Unable to sign out. Please try again.'), findsOneWidget);
   });
+
+  testWidgets('I found an item opens the found item form', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          authService: FakeAuthService(savedSession: true),
+          lostReportRepository: LostReportRepository(
+            firestore: FakeFirestore(),
+          ),
+          foundItemScreenBuilder: _foundItemForm,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('I found an item'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Found item form'), findsOneWidget);
+  });
 }
 
 Future<void> _pumpLogin(
   WidgetTester tester,
-  _FakeAuthService auth,
-  _FakeBiometricService biometrics,
+  FakeAuthService auth,
+  FakeBiometricService biometrics,
 ) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  final viewModel = AuthViewModel(
+    authService: auth,
+    biometricService: biometrics,
+  );
+  addTearDown(viewModel.dispose);
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.lightTheme,
-      home: LoginScreen(authService: auth, biometricService: biometrics),
+      home: LoginScreen(
+        viewModel: viewModel,
+        homeBuilder: (context) => HomeScreen(
+          authService: auth,
+          lostReportRepository: LostReportRepository(
+            firestore: FakeFirestore(),
+          ),
+        ),
+      ),
     ),
   );
 }
 
-// These services keep the widget tests independent of Firebase and the sensor.
-class _FakeAuthService extends AuthService {
-  _FakeAuthService({
-    this.savedSession = false,
-    this.roleError,
-    this.passwordError,
-    this.failSignOut = false,
-  });
+// Stands in for the Firebase-backed found item form in widget tests.
+Widget _foundItemForm(BuildContext context) => const Text('Found item form');
 
-  bool savedSession;
-  final String? roleError;
-  final String? passwordError;
-  final bool failSignOut;
-  int roleChecks = 0;
-  int passwordCalls = 0;
-  int signOutCalls = 0;
-
+// The found item form asks for GPS to suggest a building; without a device it
+// answers at once so the form keeps the default building order.
+class _NoGpsLocation extends LocationService {
   @override
-  bool get hasCurrentUser => savedSession;
-
-  @override
-  Future<String?> verifyStudentRole() async {
-    roleChecks++;
-    return roleError;
-  }
-
-  @override
-  Future<String?> signInStudent(String email, String password) async {
-    passwordCalls++;
-    if (passwordError != null) return passwordError;
-    savedSession = true;
-    return verifyStudentRole();
-  }
-
-  @override
-  Future<void> signOut() async {
-    signOutCalls++;
-    if (failSignOut) throw StateError('Sign-out failed');
-    savedSession = false;
-  }
-}
-
-class _FakeBiometricService extends BiometricService {
-  _FakeBiometricService({
-    this.available = true,
-    this.authenticated = true,
-    this.pendingResult,
-    this.authenticationError,
-  });
-
-  final bool available;
-  final bool authenticated;
-  final Completer<bool>? pendingResult;
-  final Object? authenticationError;
-  int availabilityChecks = 0;
-  int authenticationCalls = 0;
-
-  @override
-  Future<bool> canAuthenticate() async {
-    availabilityChecks++;
-    return available;
-  }
-
-  @override
-  Future<bool> authenticate() async {
-    authenticationCalls++;
-    if (authenticationError != null) throw authenticationError!;
-    return pendingResult?.future ?? Future.value(authenticated);
-  }
+  Future<Position> getCurrentLocation() =>
+      Future.error('No GPS in widget tests.');
 }

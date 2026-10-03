@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" /> //ubicación precisa: con hardware
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" /> // ubicación aproximada : triangulación wifi
     <application
         android:label="campusfind_flutter"
         android:name="${applicationName}"
