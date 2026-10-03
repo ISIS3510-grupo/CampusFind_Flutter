@@ -108,18 +108,16 @@ void main() {
     });
   }
 
-  testWidgets('Review this match shows the safe details placeholder', (
-    tester,
-  ) async {
-    await _pumpAlert(tester);
-    await tester.tap(find.text('Review this match'));
-    await tester.pump();
-
-    expect(
-      find.text('Item details will be available in the next flow.'),
-      findsOneWidget,
+  testWidgets('Review this match opens the claim form', (tester) async {
+    await _pumpAlert(
+      tester,
+      claimFormBuilder: (context) => const Scaffold(body: Text('Claim form')),
     );
-    expect(find.byType(MatchAlertScreen), findsOneWidget);
+    await tester.tap(find.text('Review this match'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Claim form'), findsOneWidget);
+    expect(find.byType(MatchAlertScreen), findsNothing);
   });
 
   testWidgets(
@@ -164,6 +162,7 @@ Future<void> _pumpAlert(
   WidgetTester tester, {
   FoundItem? foundItem,
   Size size = const Size(390, 844),
+  WidgetBuilder? claimFormBuilder,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -193,8 +192,11 @@ Future<void> _pumpAlert(
               ElevatedButton(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (context) =>
-                        MatchAlertScreen(lostReport: lost, matchResult: match),
+                    builder: (context) => MatchAlertScreen(
+                      lostReport: lost,
+                      matchResult: match,
+                      claimFormBuilder: claimFormBuilder,
+                    ),
                   ),
                 ),
                 child: const Text('Open S08'),

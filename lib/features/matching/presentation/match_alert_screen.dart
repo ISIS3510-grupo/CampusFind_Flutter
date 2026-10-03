@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/models/lost_report.dart';
 import '../../../core/utils/report_age.dart';
+import '../../claims/presentation/claim_form_screen.dart';
 import '../domain/match_result.dart';
 
 class MatchAlertScreen extends StatelessWidget {
@@ -9,10 +10,27 @@ class MatchAlertScreen extends StatelessWidget {
     super.key,
     required this.lostReport,
     required this.matchResult,
+    this.claimFormBuilder,
   });
 
   final LostReport lostReport;
   final MatchResult matchResult;
+  // Lets tests open the claim form with a fake repository.
+  final WidgetBuilder? claimFormBuilder;
+
+  void _openClaimForm(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder:
+            claimFormBuilder ??
+            (context) => ClaimFormScreen(
+              reportId: lostReport.id,
+              foundItemId: matchResult.foundItem.id,
+              itemTitle: matchResult.foundItem.title,
+            ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,15 +197,7 @@ class MatchAlertScreen extends StatelessWidget {
                     SizedBox(
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Item details will be available in the next flow.',
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed: () => _openClaimForm(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
