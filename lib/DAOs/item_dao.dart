@@ -12,6 +12,7 @@ class ItemDao {
     ItemModel item, {
     required String reportType,
     required String userUid,
+    String? locationName,
   }) async {
     if (reportType != 'found' && reportType != 'lost') {
       throw ArgumentError.value(
@@ -26,7 +27,7 @@ class ItemDao {
     final fields = <String, dynamic>{
       'category': item.category,
       'title': item.title,
-      'locationName': 'Current location',
+      'locationName': locationName ?? 'Current location',
       'latitude': item.location.latitude,
       'longitude': item.location.longitude,
     };
@@ -38,7 +39,8 @@ class ItemDao {
         'status': 'available',
         'semesterId': await _currentSemesterId(database),
         'donationEligible': false,
-        'donationStatus': 'not_eligible',
+        // The rules only accept 'none' when a found item is created.
+        'donationStatus': 'none',
         'createdAt': FieldValue.serverTimestamp(),
       });
     } else {

@@ -22,45 +22,46 @@ import 'support/test_fonts.dart';
 void main() {
   setUpAll(loadTestFonts);
 
-  testWidgets('Alerts pushes the injected destination and back restores Home', (
-    tester,
-  ) async {
-    final database = FakeFirestore();
-    var opened = 0;
-    await _pumpHome(
-      tester,
-      database,
-      dropOffBuilder: (context, homeBuilder) {
-        opened++;
-        return Scaffold(appBar: AppBar(title: const Text('Test drop-off')));
-      },
-    );
-    await tester.pumpAndSettle();
-    final originalHome = tester.state(find.byType(HomeScreen));
-    final originalReads = database.queries.length;
-    for (final action in ['Home', 'Search', 'Profile']) {
-      await tester.tap(find.text(action));
-      await tester.pumpAndSettle();
-      expect(opened, 0);
-      expect(tester.state(find.byType(HomeScreen)), same(originalHome));
-      expect(
-        tester
-            .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
-            .currentIndex,
-        0,
+  testWidgets(
+    'Profile pushes the injected destination and back restores Home',
+    (tester) async {
+      final database = FakeFirestore();
+      var opened = 0;
+      await _pumpHome(
+        tester,
+        database,
+        dropOffBuilder: (context, homeBuilder) {
+          opened++;
+          return Scaffold(appBar: AppBar(title: const Text('Test drop-off')));
+        },
       );
-    }
-    await tester.tap(find.text('Alerts'));
-    await tester.pumpAndSettle();
-    expect(opened, 1);
-    expect(find.text('Test drop-off'), findsOneWidget);
-    expect(find.byType(HomeScreen), findsNothing);
-    expect(find.byType(HomeScreen, skipOffstage: false), findsOneWidget);
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-    expect(tester.state(find.byType(HomeScreen)), same(originalHome));
-    expect(database.queries, hasLength(originalReads));
-  });
+      await tester.pumpAndSettle();
+      final originalHome = tester.state(find.byType(HomeScreen));
+      final originalReads = database.queries.length;
+      for (final action in ['Home', 'Search']) {
+        await tester.tap(find.text(action));
+        await tester.pumpAndSettle();
+        expect(opened, 0);
+        expect(tester.state(find.byType(HomeScreen)), same(originalHome));
+        expect(
+          tester
+              .widget<BottomNavigationBar>(find.byType(BottomNavigationBar))
+              .currentIndex,
+          0,
+        );
+      }
+      await tester.tap(find.text('Profile'));
+      await tester.pumpAndSettle();
+      expect(opened, 1);
+      expect(find.text('Test drop-off'), findsOneWidget);
+      expect(find.byType(HomeScreen), findsNothing);
+      expect(find.byType(HomeScreen, skipOffstage: false), findsOneWidget);
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(tester.state(find.byType(HomeScreen)), same(originalHome));
+      expect(database.queries, hasLength(originalReads));
+    },
+  );
 
   testWidgets('S12 back arrow returns to the existing Home without reloading', (
     tester,
@@ -82,7 +83,7 @@ void main() {
     await tester.pumpAndSettle();
     final originalHome = tester.state(find.byType(HomeScreen));
     final originalReads = database.queries.length;
-    await tester.tap(find.text('Alerts'));
+    await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
     expect(find.byType(DropOffInstructionsScreen), findsOneWidget);
     await tester.tap(find.byTooltip('Back'));
@@ -117,7 +118,7 @@ void main() {
           .viewModel!;
       // Repeat the full flow to check that the return route retains the builder.
       for (var visit = 0; visit < 2; visit++) {
-        await tester.tap(find.text('Alerts'));
+        await tester.tap(find.text('Profile'));
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.text('Back to Home'));
         await tester.tap(find.text('Back to Home'));

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../viewmodels/item_viewmodel.dart';
+import '../models/campus_locations.dart'; // <-- Importa el modelo de ubicación
 
 class ReportItemScreen extends StatefulWidget {
   const ReportItemScreen({super.key, required this.reportType})
@@ -18,6 +19,16 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _categoryController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Carga la ubicación del GPS y ordena los edificios por cercanía al abrir la pantalla
+    // Usamos addPostFrameCallback para asegurarnos de que el contexto esté listo para llamar al ViewModel
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ItemViewModel>().loadPrioritizedLocations();
+    });
+  }
 
   @override
   void dispose() {
@@ -40,7 +51,9 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Objeto reportado con éxito con ubicación GPS'),
+              content: Text(
+                'Objeto reportado con éxito con ubicación del campus',
+              ),
             ),
           );
           _formKey.currentState!.reset();
@@ -57,6 +70,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Escuchamos el ViewModel para reaccionar a cambios de estado
     final viewModel = context.watch<ItemViewModel>();
 
     return Scaffold(
@@ -80,6 +94,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                     ? 'Ingresa un título'
                     : null,
               ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(labelText: 'Descripción'),
@@ -87,6 +102,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                     ? 'Ingresa una descripción'
                     : null,
               ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _categoryController,
                 decoration: const InputDecoration(labelText: 'Categoría'),
@@ -95,11 +111,57 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                     : null,
               ),
               const SizedBox(height: 20),
+
+              // --- SECCIÓN DE UBICACIÓN INTELIGENTE (GPS + Campus) ---
+              const Text(
+                'Ubicación en el Campus',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+
+              viewModel.isLoadingLocation
+                  ? const LinearProgressIndicator() // Muestra barra de carga mientras el GPS calcula el más cercano
+                  : DropdownButtonFormField<CampusLocation>(
+                      value: viewModel.selectedLocation,
+                      // Long building names are cut with "..." instead of
+                      // overflowing the form on small screens.
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.location_on),
+                      ),
+                      items: viewModel.locations.map((loc) {
+                        final bool isClosest = loc == viewModel.locations.first;
+                        return DropdownMenuItem<CampusLocation>(
+                          value: loc,
+                          child: Text(
+                            isClosest
+                                ? '${loc.name} (Sugerido - Más cercano)'
+                                : loc.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: isClosest
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: isClosest
+                                  ? Colors.blue[800]
+                                  : Colors.black87,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (CampusLocation? newLocation) {
+                        viewModel.selectLocation(newLocation);
+                      },
+                    ),
+
+              const SizedBox(height: 24),
+
               viewModel.isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : ElevatedButton(
                       onPressed: () => _submitForm(viewModel),
-                      child: const Text('Guardar y Obtener Ubicación'),
+                      child: const Text('Guardar Reporte'),
                     ),
             ],
           ),

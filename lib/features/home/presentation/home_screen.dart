@@ -12,6 +12,12 @@ import '../../matching/data/matching_config_repository.dart';
 import '../../matching/presentation/match_alert_screen.dart';
 import '../../matching/services/matching_service.dart';
 import '../viewmodel/home_view_model.dart';
+import '../../analytics/data/firestore_feature_usage_tracker.dart';
+import '../../analytics/domain/app_feature.dart';
+import '../../analytics/domain/feature_usage_tracker.dart';
+import '../../reports/presentation/report_lost_item_screen.dart';
+import '../../../views/notification_screen.dart';
+import 'widgets/home_action_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -23,6 +29,8 @@ class HomeScreen extends StatefulWidget {
     this.createMatchingService,
     this.viewModel,
     this.dropOffBuilder,
+    this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
+    this.foundItemScreenBuilder = _defaultFoundItemScreen,
   });
 
   final AuthService authService;
@@ -35,6 +43,13 @@ class HomeScreen extends StatefulWidget {
   // Receives the same Home configuration for S12's Back to Home action.
   final Widget Function(BuildContext context, WidgetBuilder homeBuilder)?
   dropOffBuilder;
+  final FeatureUsageTracker featureUsageTracker;
+
+  // Screen opened by "I found an item"; tests replace it to avoid Firebase.
+  final WidgetBuilder foundItemScreenBuilder;
+
+  static Widget _defaultFoundItemScreen(BuildContext context) =>
+      const ReportItemScreen(reportType: 'found');
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -225,124 +240,50 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Material(
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        side: const BorderSide(color: Color(0xFFE2DEDE)),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: InkWell(
-                        onTap: () {},
-                        borderRadius: BorderRadius.circular(10),
-                        child: const SizedBox(
-                          height: 122,
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(24, 22, 24, 0),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: EdgeInsets.only(top: 3),
-                                  child: Icon(
-                                    Icons.search,
-                                    size: 31,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                SizedBox(width: 23),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Search found items',
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.black,
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                      SizedBox(height: 10),
-                                      Text(
-                                        'Check if something similar has already been registered.',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w300,
-                                          color: Color(0xFF999798),
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                    HomeActionCard(
+                      icon: Icons.search,
+                      title: 'Search found items',
+                      subtitle: 'Check if something similar has already been registered.',
+                      large: true,
+                      onTap: () => widget.featureUsageTracker.track(
+                        AppFeature.searchFoundItems,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Material(
-                      color: const Color(0xFFFEFD05),
-                      borderRadius: BorderRadius.circular(10),
-                      child: InkWell(
-                        onTap: () => Navigator.of(context).push(
+                    HomeActionCard(
+                      icon: Icons.report_outlined,
+                      title: 'I lost an item',
+                      subtitle: 'Report it and get notified if it is found.',
+                      onTap: () {
+                        widget.featureUsageTracker.track(
+                          AppFeature.reportLostItem,
+                        );
+                        Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (context) =>
-                                const ReportItemScreen(reportType: 'found'),
-                          ),
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        child: const SizedBox(
-                          height: 104,
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(24, 20, 20, 0),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: EdgeInsets.only(top: 5),
-                                  child: Icon(
-                                    Icons.add,
-                                    size: 28,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                SizedBox(width: 20),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'I found an item',
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.black,
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                      SizedBox(height: 10),
-                                      Text(
-                                        'Report it and see where to deliver it.',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w300,
-                                          color: Colors.black,
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            builder: (context) => ReportLostItemScreen(
+                              featureUsageTracker: widget.featureUsageTracker,
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    HomeActionCard(
+                      icon: Icons.add,
+                      title: 'I found an item',
+                      subtitle: 'Report it and see where to deliver it.',
+                      highlighted: true,
+                      onTap: () {
+                        widget.featureUsageTracker.track(
+                          AppFeature.reportFoundItem,
+                        );
+                        // Report screen with the GPS location of the item.
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: widget.foundItemScreenBuilder,
+                          ),
+                        );
+                      },
                     ),
                     if (_viewModel.isLoading)
                       const Padding(
@@ -389,8 +330,16 @@ class _HomeScreenState extends State<HomeScreen> {
             child: BottomNavigationBar(
               currentIndex: 0,
               onTap: (index) {
-                // Temporary Sprint testing entry point for S12.
-                if (index == 2) _openDropOff();
+                // Alerts tab: notifications sent by the backend (Sofia).
+                if (index == 2) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  );
+                }
+                // Temporary Sprint testing entry point for S12 (Emilio).
+                if (index == 3) _openDropOff();
               },
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,

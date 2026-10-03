@@ -62,7 +62,7 @@ void main() {
             'status': 'available',
             'semesterId': '2027-1',
             'donationEligible': false,
-            'donationStatus': 'not_eligible',
+            'donationStatus': 'none',
             'createdAt': FieldValue.serverTimestamp(),
           } else ...{
             'ownerUid': 'student-1',

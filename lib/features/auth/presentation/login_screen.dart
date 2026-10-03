@@ -5,6 +5,7 @@ import '../../home/presentation/home_screen.dart';
 import '../data/auth_service.dart';
 import '../data/biometric_service.dart';
 import '../viewmodel/auth_view_model.dart';
+import '../../../utils/email_validator.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -326,6 +327,15 @@ class _SignInDialogState extends State<_SignInDialog> {
       setState(
         () => _validationMessage = 'Please enter your email and password.',
       );
+      return;
+    }
+
+    // Rejects non-Uniandes emails before calling Firebase (Sofia).
+    final emailError = EmailValidator.validateUniandesEmail(
+      _emailController.text.trim(),
+    );
+    if (emailError != null) {
+      setState(() => _validationMessage = emailError);
       return;
     }
 
