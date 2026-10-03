@@ -13,4 +13,22 @@ enum AppFeature {
   const AppFeature(this.id);
 
   final String id;
+
+  // Name shown in the analytics dashboard.
+  String get label => switch (this) {
+    AppFeature.searchFoundItems => 'Search found items',
+    AppFeature.reportLostItem => 'Open "I lost an item"',
+    AppFeature.submitLostReport => 'Send a lost report',
+    AppFeature.reportFoundItem => 'Open "I found an item"',
+    AppFeature.viewMyReport => 'View my report',
+    AppFeature.passwordLogin => 'Password login',
+    AppFeature.biometricLogin => 'Biometric login',
+  };
+
+  static AppFeature? fromId(String id) {
+    for (final feature in values) {
+      if (feature.id == id) return feature;
+    }
+    return null;
+  }
 }

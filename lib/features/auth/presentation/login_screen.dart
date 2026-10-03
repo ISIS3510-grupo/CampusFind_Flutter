@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../analytics/presentation/analytics_dashboard_screen.dart';
+import '../../analytics/presentation/feature_usage_panel.dart';
 import '../../home/presentation/home_screen.dart';
 import '../data/auth_service.dart';
 import '../data/biometric_service.dart';
@@ -111,7 +112,10 @@ class _LoginScreenState extends State<LoginScreen> {
       MaterialPageRoute<void>(
         builder:
             widget.staffDashboardBuilder ??
-            (context) => const AnalyticsDashboardScreen(),
+            (context) => const AnalyticsDashboardScreen(
+              // Jhostin's Type 3 BQ, next to the bottleneck and timing BQs.
+              additionalPanels: [FeatureUsagePanel()],
+            ),
       ),
     );
   }
