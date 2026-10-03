@@ -8,7 +8,6 @@ class ItemModel {
   final String description;
   final String category;
   final GeoPoint location;
-  final String userEmail;
   final DateTime? createdAt;
 
   ItemModel({
@@ -17,7 +16,6 @@ class ItemModel {
     required this.description,
     required this.category,
     required this.location,
-    required this.userEmail,
     this.createdAt,
   });
 
@@ -28,7 +26,6 @@ class ItemModel {
       'description': description,
       'category': category,
       'location': location,
-      'userEmail': userEmail,
       'createdAt': createdAt ?? FieldValue.serverTimestamp(),
     };
   }
@@ -42,7 +39,6 @@ class ItemModel {
       description: data['description'] ?? '',
       category: data['category'] ?? '',
       location: data['location'] as GeoPoint,
-      userEmail: data['userEmail'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
   }
