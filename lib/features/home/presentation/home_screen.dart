@@ -1,70 +1,160 @@
 import 'package:flutter/material.dart';
 
-import 'package:campusfind_flutter/features/analytics/data/firestore_feature_usage_tracker.dart';
-import 'package:campusfind_flutter/features/analytics/domain/app_feature.dart';
-import 'package:campusfind_flutter/features/analytics/domain/feature_usage_tracker.dart';
-import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
-import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
-import 'package:campusfind_flutter/features/home/presentation/widgets/home_action_card.dart';
-import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_screen.dart';
-import 'package:campusfind_flutter/views/notification_screen.dart';
-import 'package:campusfind_flutter/views/report_item_screen.dart';
+import '../../../core/data/found_item_repository.dart';
+import '../../../core/data/lost_report_repository.dart';
+import '../../../core/models/lost_report.dart';
+import '../../../core/utils/report_age.dart';
+import '../../../views/report_item_screen.dart';
+import '../../auth/data/auth_service.dart';
+import '../../auth/presentation/login_screen.dart';
+import '../../drop_off/presentation/drop_off_instructions_screen.dart';
+import '../../matching/data/matching_config_repository.dart';
+import '../../matching/presentation/match_alert_screen.dart';
+import '../../matching/services/matching_service.dart';
+import '../viewmodel/home_view_model.dart';
+import '../../analytics/data/firestore_feature_usage_tracker.dart';
+import '../../analytics/domain/app_feature.dart';
+import '../../analytics/domain/feature_usage_tracker.dart';
+import '../../reports/presentation/report_lost_item_screen.dart';
+import '../../../views/notification_screen.dart';
+import 'widgets/home_action_card.dart';
 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     this.authService = const AuthService(),
+    this.lostReportRepository = const LostReportRepository(),
+    this.foundItemRepository = const FoundItemRepository(),
+    this.matchingConfigRepository = const MatchingConfigRepository(),
+    this.createMatchingService,
+    this.viewModel,
+    this.dropOffBuilder,
     this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
     this.foundItemScreenBuilder = _defaultFoundItemScreen,
   });
 
   final AuthService authService;
+  final LostReportRepository lostReportRepository;
+  final FoundItemRepository foundItemRepository;
+  final MatchingConfigRepository matchingConfigRepository;
+  final MatchingService Function(double threshold)? createMatchingService;
+  // Injected ViewModels remain owned by the caller.
+  final HomeViewModel? viewModel;
+  // Receives the same Home configuration for S12's Back to Home action.
+  final Widget Function(BuildContext context, WidgetBuilder homeBuilder)?
+  dropOffBuilder;
   final FeatureUsageTracker featureUsageTracker;
 
   // Screen opened by "I found an item"; tests replace it to avoid Firebase.
   final WidgetBuilder foundItemScreenBuilder;
 
   static Widget _defaultFoundItemScreen(BuildContext context) =>
-      const ReportItemScreen();
+      const ReportItemScreen(reportType: 'found');
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _signingOut = false;
+  late final HomeViewModel _viewModel;
+  late final bool _ownsViewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel =
+        widget.viewModel ??
+        HomeViewModel(
+          authService: widget.authService,
+          lostReportRepository: widget.lostReportRepository,
+          foundItemRepository: widget.foundItemRepository,
+          matchingConfigRepository: widget.matchingConfigRepository,
+          createMatchingService: widget.createMatchingService,
+        );
+    _viewModel.loadHome();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
+  }
+
+  void _openMatchAlert() {
+    final report = _viewModel.activeReport;
+    final match = _viewModel.bestMatch;
+    if (report == null || match == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            MatchAlertScreen(lostReport: report, matchResult: match),
+      ),
+    );
+  }
+
+  void _openDropOff() {
+    final home = HomeScreen(
+      authService: _viewModel.authService,
+      lostReportRepository: _viewModel.lostReportRepository,
+      foundItemRepository: _viewModel.foundItemRepository,
+      matchingConfigRepository: _viewModel.matchingConfigRepository,
+      createMatchingService: _viewModel.createMatchingService,
+      dropOffBuilder: widget.dropOffBuilder,
+    );
+    Widget homeBuilder(BuildContext context) => home;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            widget.dropOffBuilder?.call(context, homeBuilder) ??
+            DropOffInstructionsScreen(homeBuilder: homeBuilder),
+      ),
+    );
+  }
 
   Future<void> _signOut() async {
-    if (_signingOut) return;
-    setState(() => _signingOut = true);
-
-    try {
-      await widget.authService.signOut();
-      if (!mounted) return;
-
+    final signedOut = await _viewModel.signOut();
+    if (!mounted) return;
+    if (signedOut) {
+      final authService = _viewModel.authService;
+      final lostReportRepository = _viewModel.lostReportRepository;
+      final foundItemRepository = _viewModel.foundItemRepository;
+      final matchingConfigRepository = _viewModel.matchingConfigRepository;
+      final createMatchingService = _viewModel.createMatchingService;
       // Removes Home so the back button cannot reopen the signed-out session.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
-          builder: (context) => LoginScreen(authService: widget.authService),
+          builder: (context) => LoginScreen(
+            authService: authService,
+            homeBuilder: (context) => HomeScreen(
+              authService: authService,
+              lostReportRepository: lostReportRepository,
+              foundItemRepository: foundItemRepository,
+              matchingConfigRepository: matchingConfigRepository,
+              createMatchingService: createMatchingService,
+            ),
+          ),
         ),
         (route) => false,
       );
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to sign out. Please try again.'),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _signingOut = false);
+    } else if (_viewModel.signOutError != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(_viewModel.signOutError!)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) => _buildHome(context),
+    );
+  }
+
+  Widget _buildHome(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -121,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     IconButton(
-                      onPressed: _signingOut ? null : _signOut,
+                      onPressed: _viewModel.isSigningOut ? null : _signOut,
                       tooltip: 'Sign out',
                       constraints: const BoxConstraints.tightFor(
                         width: 44,
@@ -154,8 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     HomeActionCard(
                       icon: Icons.search,
                       title: 'Search found items',
-                      subtitle:
-                          'Check if something similar has already been registered.',
+                      subtitle: 'Check if something similar has already been registered.',
                       large: true,
                       onTap: () => widget.featureUsageTracker.track(
                         AppFeature.searchFoundItems,
@@ -197,92 +286,33 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     ),
-                    const SizedBox(height: 36),
-                    const Text(
-                      'My active report',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 13),
-                    // Temporary UI data; the report team will connect this later.
-                    Container(
-                      height: 116,
-                      padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFE2DEDE)),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 92,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE2DEDE),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.image,
-                              size: 26,
-                              color: Color(0xFF999798),
+                    if (_viewModel.isLoading)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 36),
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              semanticsLabel: 'Loading active report',
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Scientific calculator',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black,
-                                    height: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 9),
-                                const Text(
-                                  'Lost in ML · 2 days ago',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w300,
-                                    color: Color(0xFF999798),
-                                    height: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Container(
-                                  width: 120,
-                                  height: 28,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFEFD05),
-                                    border: Border.all(
-                                      color: const Color(0xFFE2DEDE),
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Text(
-                                    'Possible match',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                    if (_viewModel.activeReport != null)
+                      _buildActiveReportSection(_viewModel.activeReport!),
+                    if (_viewModel.errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Text(
+                          _viewModel.errorMessage!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF999798),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -301,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: BottomNavigationBar(
               currentIndex: 0,
               onTap: (index) {
-                // Alerts tab: notifications sent by the backend.
+                // Alerts tab: notifications sent by the backend (Sofia).
                 if (index == 2) {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -309,6 +339,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   );
                 }
+                // Temporary Sprint testing entry point for S12 (Emilio).
+                if (index == 3) _openDropOff();
               },
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
@@ -337,6 +369,126 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+  Widget _buildActiveReportSection(LostReport report) {
+    final location = report.locationName.trim();
+    final age = reportAge(report.reportedAt);
+    final subtitle = location.isEmpty ? age : 'Lost in $location · $age';
+    final imageUrl = report.imageUrl?.trim();
+    const placeholder = Center(
+      child: Icon(Icons.image, size: 26, color: Color(0xFF999798)),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 36),
+        const Text(
+          'My active report',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 13),
+        Container(
+          constraints: const BoxConstraints(minHeight: 116),
+          padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFE2DEDE)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 92,
+                  height: 96,
+                  color: const Color(0xFFE2DEDE),
+                  child: imageUrl == null || imageUrl.isEmpty
+                      ? placeholder
+                      : Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              placeholder,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 6),
+                    Text(
+                      report.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w300,
+                        color: Color(0xFF999798),
+                        height: 1.2,
+                      ),
+                    ),
+                    if (_viewModel.bestMatch != null) ...[
+                      const SizedBox(height: 16),
+                      Semantics(
+                        button: true,
+                        child: Material(
+                          color: const Color(0xFFFEFD05),
+                          shape: RoundedRectangleBorder(
+                            side: const BorderSide(color: Color(0xFFE2DEDE)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: InkWell(
+                            onTap: _openMatchAlert,
+                            borderRadius: BorderRadius.circular(10),
+                            child: const SizedBox(
+                              width: 120,
+                              height: 28,
+                              child: Center(
+                                child: Text(
+                                  'Possible match',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

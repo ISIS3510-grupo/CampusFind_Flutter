@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../viewmodels/item_viewmodel.dart';
 import '../models/campus_locations.dart';
 
 class ReportItemScreen extends StatefulWidget {
-  const ReportItemScreen({super.key});
+  const ReportItemScreen({super.key, required this.reportType})
+    : assert(reportType == 'found' || reportType == 'lost');
+
+  final String reportType;
 
   @override
   State<ReportItemScreen> createState() => _ReportItemScreenState();
@@ -15,7 +19,6 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _categoryController = TextEditingController();
-  final _emailController = TextEditingController();
 
   static const Color uniandesYellow = Color(0xFFFFF200);
 
@@ -32,17 +35,16 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     _categoryController.dispose();
-    _emailController.dispose();
     super.dispose();
   }
 
   void _submitForm(ItemViewModel viewModel) async {
     if (_formKey.currentState!.validate()) {
       bool success = await viewModel.reportItem(
-        title: _titleController.text,
-        description: _descriptionController.text,
-        category: _categoryController.text,
-        userEmail: _emailController.text,
+        reportType: widget.reportType,
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        category: _categoryController.text.trim(),
       );
 
       if (mounted) {
@@ -74,31 +76,11 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     final viewModel = context.watch<ItemViewModel>();
 
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: uniandesYellow,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'uniandes',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-            Text(
-              'Reportar Objeto',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+        title: Text(
+          widget.reportType == 'found'
+              ? 'Report Found Item'
+              : 'Report Lost Item',
         ),
       ),
       body: Padding(
@@ -109,55 +91,26 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
             children: [
               TextFormField(
                 controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Título',
-                  border: OutlineInputBorder(),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black, width: 2),
-                  ),
-                ),
-                validator: (val) =>
-                    val == null || val.isEmpty ? 'Ingresa un título' : null,
+                decoration: const InputDecoration(labelText: 'Título'),
+                validator: (val) => val == null || val.trim().isEmpty
+                    ? 'Ingresa un título'
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción',
-                  border: OutlineInputBorder(),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black, width: 2),
-                  ),
-                ),
-                validator: (val) => val == null || val.isEmpty
+                decoration: const InputDecoration(labelText: 'Descripción'),
+                validator: (val) => val == null || val.trim().isEmpty
                     ? 'Ingresa una descripción'
                     : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _categoryController,
-                decoration: const InputDecoration(
-                  labelText: 'Categoría',
-                  border: OutlineInputBorder(),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black, width: 2),
-                  ),
-                ),
-                validator: (val) =>
-                    val == null || val.isEmpty ? 'Ingresa una categoría' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Correo Uniandes',
-                  border: OutlineInputBorder(),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.black, width: 2),
-                  ),
-                ),
-                validator: (val) =>
-                    val == null || val.isEmpty ? 'Ingresa tu correo' : null,
+                decoration: const InputDecoration(labelText: 'Categoría'),
+                validator: (val) => val == null || val.trim().isEmpty
+                    ? 'Ingresa una categoría'
+                    : null,
               ),
               const SizedBox(height: 20),
 
@@ -180,6 +133,9 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                   : DropdownButtonFormField<CampusLocation>(
                       isExpanded: true, // no overflow horizontal de la sugerencia
                       value: viewModel.selectedLocation,
+                      // Long building names are cut with "..." instead of
+                      // overflowing the form on small screens.
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(
@@ -196,8 +152,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                             isClosest
                                 ? '${loc.name} (Sugerido - Más cercano)'
                                 : loc.name,
-                            overflow: TextOverflow.ellipsis, 
-                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontWeight: isClosest
                                   ? FontWeight.bold
