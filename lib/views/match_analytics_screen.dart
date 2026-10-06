@@ -1,4 +1,5 @@
 import 'package:campusfind_flutter/services/match_analytics_service.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 class MatchAnalyticsScreen extends StatefulWidget {
@@ -47,8 +48,15 @@ class _MatchAnalyticsScreenState extends State<MatchAnalyticsScreen> {
             }
 
             if (snapshot.hasError) {
+              final error = snapshot.error;
+              final denied = error is FirebaseException &&
+                  error.code == 'permission-denied';
               return Center(
-                child: Text('Error al calcular métricas: ${snapshot.error}'),
+                child: Text(
+                  denied
+                      ? 'Solo un admin puede ver esta métrica.'
+                      : 'Error al calcular métricas: $error',
+                ),
               );
             }
 

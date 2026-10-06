@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class MatchAnalyticsMetrics {
   final double percentage;
@@ -13,24 +14,25 @@ class MatchAnalyticsMetrics {
 }
 
 class MatchAnalyticsService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  MatchAnalyticsService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  // Registra que el estudiante abrió/revisó el detalle de un match
+  final FirebaseFirestore _firestore;
+
+  // Registra que el estudiante abrió/revisó el match. Las reglas solo dejan
+  // al destinatario escribir viewedAt una vez, así que si ya existe no se toca.
   Future<void> trackMatchReviewed({
-    required String matchId,
-    required String studentUid,
+    required String notificationId,
+    required bool alreadyViewed,
   }) async {
+    if (alreadyViewed) return;
     try {
-      await _firestore.collection('analytics').add({
-        'feature': 'match_review_bq',
-        'matchId': matchId,
-        'recipientUid': studentUid,
-        'eventType': 'match_reviewed',
-        'timestamp': FieldValue.serverTimestamp(),
+      await _firestore.collection('notifications').doc(notificationId).update({
+        'viewedAt': FieldValue.serverTimestamp(),
       });
-      print('Evento match_reviewed registrado exitosamente');
+      debugPrint('Evento match_reviewed registrado exitosamente');
     } catch (e) {
-      print('Error al registrar match_reviewed: $e');
+      debugPrint('Error al registrar match_reviewed: $e');
     }
   }
 
@@ -40,50 +42,28 @@ class MatchAnalyticsService {
     return metrics.percentage;
   }
 
-  // Obtiene el desglose completo para la interfaz de usuario
+  // Enviadas = notificaciones creadas; revisadas = las que tienen viewedAt.
+  // Las reglas solo permiten este conteo global a un admin.
   Future<MatchAnalyticsMetrics> getMatchReviewMetrics() async {
-    try {
-      final snapshot = await _firestore
-          .collection('analytics')
-          .where('feature', isEqualTo: 'match_review_bq')
-          .get();
+    final notifications = _firestore.collection('notifications');
+    final sent = await notifications.count().get();
+    final reviewed =
+        await notifications.where('viewedAt', isNull: false).count().get();
 
-      final Set<String> sentMatchIds = {};
-      final Set<String> reviewedMatchIds = {};
-
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final matchId = data['matchId'] as String?;
-        final eventType = data['eventType'] as String?;
-
-        if (matchId != null && matchId.isNotEmpty) {
-          if (eventType == 'notification_sent') {
-            sentMatchIds.add(matchId);
-          } else if (eventType == 'match_reviewed') {
-            reviewedMatchIds.add(matchId);
-          }
-        }
-      }
-
-      if (sentMatchIds.isEmpty) {
-        return MatchAnalyticsMetrics(percentage: 0.0,totalSent: 0,totalReviewed: 0,);
-      }
-
-      final reviewedCount = reviewedMatchIds.intersection(sentMatchIds).length;
-      final percentage = (reviewedCount / sentMatchIds.length) * 100;
-
-      return MatchAnalyticsMetrics(
-        percentage: percentage,
-        totalSent: sentMatchIds.length,
-        totalReviewed: reviewedCount,
-      );
-    } catch (e) {
-      print('Error al calcular el porcentaje: $e');
+    final totalSent = sent.count ?? 0;
+    final totalReviewed = reviewed.count ?? 0;
+    if (totalSent == 0) {
       return MatchAnalyticsMetrics(
         percentage: 0.0,
         totalSent: 0,
         totalReviewed: 0,
       );
     }
+
+    return MatchAnalyticsMetrics(
+      percentage: (totalReviewed / totalSent) * 100,
+      totalSent: totalSent,
+      totalReviewed: totalReviewed,
+    );
   }
 }

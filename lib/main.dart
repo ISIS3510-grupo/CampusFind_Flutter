@@ -10,8 +10,6 @@ import 'package:campusfind_flutter/features/reports/data/pending_report_sync.dar
 import 'package:campusfind_flutter/firebase_options.dart';
 import 'package:campusfind_flutter/viewmodels/item_viewmodel.dart';
 
-import 'package:campusfind_flutter/views/match_analytics_screen.dart';
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -35,5 +33,3 @@ Future<void> main() async {
     ),
   );
 }
- 
-
