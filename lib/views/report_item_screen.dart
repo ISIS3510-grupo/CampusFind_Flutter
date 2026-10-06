@@ -131,7 +131,6 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                       backgroundColor: uniandesYellow,
                     )
                   : DropdownButtonFormField<CampusLocation>(
-                      isExpanded: true, // no overflow horizontal de la sugerencia
                       value: viewModel.selectedLocation,
                       // Long building names are cut with "..." instead of
                       // overflowing the form on small screens.

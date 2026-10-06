@@ -19,7 +19,6 @@ import '../../reports/presentation/report_lost_item_screen.dart';
 import '../../../views/notification_screen.dart';
 import 'widgets/home_action_card.dart';
 
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -371,7 +370,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
 
   Widget _buildActiveReportSection(LostReport report) {
     final location = report.locationName.trim();

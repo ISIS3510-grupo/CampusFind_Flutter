@@ -37,14 +37,11 @@ class ItemViewModel extends ChangeNotifier {
     try {
       Position position = await _locationService.getCurrentLocation();
 
-      final sortedList = List<CampusLocation>.from(defaultUniandesLocations);
-      sortedList.sort((a, b) {
-        final distA = a.distanceTo(position.latitude, position.longitude);
-        final distB = b.distanceTo(position.latitude, position.longitude);
-        return distA.compareTo(distB);
-      });
-
-      locations = sortedList;
+      locations = await _locationService.sortLocationsByGoogleMaps(
+        userLat: position.latitude,
+        userLng: position.longitude,
+        locations: defaultUniandesLocations,
+      );
     } catch (_) {
       locations = defaultUniandesLocations;
     } finally {

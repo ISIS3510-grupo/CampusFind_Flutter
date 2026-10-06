@@ -4,7 +4,11 @@ import 'package:http/http.dart' as http;
 import '../models/campus_locations.dart';
 
 class LocationService {
-  static const String _googleApiKey = 'AIzaSyBV4lIfhte1hKT-mfSWbJ3OqHmKic52Oqw';
+  // Se pasa al compilar: --dart-define=GOOGLE_MAPS_API_KEY=...
+  // Sin key se ordena localmente por Haversine.
+  static const String _googleApiKey = String.fromEnvironment(
+    'GOOGLE_MAPS_API_KEY',
+  );
 
   /// Obtiene la ubicación GPS actual con máxima precisión
   Future<Position> getCurrentLocation() async {
@@ -42,6 +46,9 @@ class LocationService {
     required List<CampusLocation> locations,
   }) async {
     if (locations.isEmpty) return locations;
+    if (_googleApiKey.isEmpty) {
+      return _sortLocally(userLat, userLng, locations);
+    }
 
     // Construir lista de destinos "lat,lng|lat,lng|..."
     final destinations = locations
@@ -90,6 +97,14 @@ class LocationService {
     }
 
     // Fallback local en caso de error
+    return _sortLocally(userLat, userLng, locations);
+  }
+
+  List<CampusLocation> _sortLocally(
+    double userLat,
+    double userLng,
+    List<CampusLocation> locations,
+  ) {
     final sortedList = List<CampusLocation>.from(locations);
     sortedList.sort((a, b) =>
         a.distanceTo(userLat, userLng).compareTo(b.distanceTo(userLat, userLng)));
