@@ -14,28 +14,26 @@ class ItemViewModel extends ChangeNotifier {
   bool isLoadingLocation = false;
   String? errorMessage;
 
-  // Lista de ubicaciones del campus y la seleccionada actualmente
   List<CampusLocation> locations = defaultUniandesLocations;
   CampusLocation? selectedLocation;
 
-  /// Carga la ubicación GPS actual y reordena el listado de edificios por cercanía
+  /// Carga la ubicación GPS actual y prioriza mediante Google Maps API
   Future<void> loadPrioritizedLocations() async {
     isLoadingLocation = true;
     notifyListeners();
 
     try {
       Position position = await _locationService.getCurrentLocation();
-      
-      final sortedList = List<CampusLocation>.from(defaultUniandesLocations);
-      sortedList.sort((a, b) {
-        final distA = a.distanceTo(position.latitude, position.longitude);
-        final distB = b.distanceTo(position.latitude, position.longitude);
-        return distA.compareTo(distB);
-      });
+
+      // Consulta Google Maps API para reordenar por distancia peatonal/real
+      final sortedList = await _locationService.sortLocationsByGoogleMaps(
+        userLat: position.latitude,
+        userLng: position.longitude,
+        locations: defaultUniandesLocations,
+      );
 
       locations = sortedList;
     } catch (_) {
-      // Si falla el GPS o deniegan permisos, dejamos el orden por defecto
       locations = defaultUniandesLocations;
     } finally {
       selectedLocation = locations.isNotEmpty ? locations.first : null;
@@ -44,13 +42,11 @@ class ItemViewModel extends ChangeNotifier {
     }
   }
 
-  /// Actualiza la ubicación seleccionada manualmente por el usuario en el formulario
   void selectLocation(CampusLocation? location) {
     selectedLocation = location;
     notifyListeners();
   }
 
-  // Solo se encarga de empaquetar la ubicación y guardar el reporte
   Future<bool> reportItem({
     required String title,
     required String description,
@@ -62,23 +58,17 @@ class ItemViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Si el usuario seleccionó un edificio específico, guardamos sus coordenadas de referencia.
-      // Si prefieres usar la coordenada exacta del GPS en lugar del edificio, puedes descomentar la línea de abajo:
-      // Position position = await _locationService.getCurrentLocation();
+      final double lat = selectedLocation?.latitude ?? 4.601489;
+      final double lng = selectedLocation?.longitude ?? -74.066125;
 
-      final double lat = selectedLocation?.latitude ?? 4.6014;
-      final double lng = selectedLocation?.longitude ?? -74.0661;
-
-      // 2. Construye el modelo
       ItemModel newItem = ItemModel(
         title: title,
         description: description,
         category: category,
-        location: GeoPoint(lat, lng), // Usa la ubicación seleccionada/sugerida
+        location: GeoPoint(lat, lng),
         userEmail: userEmail,
       );
 
-      // 3. Lo guarda mediante el DAO
       await _itemDao.insertItem(newItem);
 
       isLoading = false;
