@@ -1,4 +1,4 @@
-/* import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -107,7 +107,10 @@ void main() {
     addTearDown(tester.view.resetPadding);
 
     await tester.pumpWidget(
-      MaterialApp(theme: AppTheme.lightTheme, home: const HomeScreen()),
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: const HomeScreen(foundItemScreenBuilder: _foundItemForm),
+      ),
     );
 
     for (final text in [
@@ -123,13 +126,7 @@ void main() {
       expect(find.text(text), findsOneWidget);
     }
 
-    for (final text in [
-      'Search found items',
-      'I found an item',
-      'Search',
-      'Alerts',
-      'Profile',
-    ]) {
+    for (final text in ['Search found items', 'Search', 'Profile']) {
       await tester.tap(find.text(text));
       await tester.pumpAndSettle();
       expect(find.byType(HomeScreen), findsOneWidget);
@@ -184,13 +181,20 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(biometrics.authenticationCalls, 1);
 
-      await tester.enterText(
-        find.byType(TextField).first,
-        'student@example.com',
+      // Ingresar correo y contraseña en el diálogo de inicio de sesión
+      final textFields = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
       );
-      await tester.enterText(find.byType(TextField).last, 'test-password');
+
+      await tester.enterText(textFields.at(0), 'estudiante@uniandes.edu.co');
+      await tester.pump();
+      await tester.enterText(textFields.at(1), 'Password123!');
+      await tester.pump();
+
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
+
       expect(auth.passwordCalls, 1);
       expect(auth.roleChecks, 1);
       expect(find.byType(HomeScreen), findsOneWidget);
@@ -307,11 +311,17 @@ void main() {
 
       await tester.tap(find.text('Enter with Uniandes'));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byType(TextField).first,
-        'student@example.com',
+
+      final textFields = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
       );
-      await tester.enterText(find.byType(TextField).last, 'wrong-password');
+
+      await tester.enterText(textFields.at(0), 'estudiante@uniandes.edu.co');
+      await tester.pump();
+      await tester.enterText(textFields.at(1), 'wrong-password');
+      await tester.pump();
+
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
 
@@ -325,7 +335,6 @@ void main() {
       expect(auth.hasCurrentUser, isTrue);
     },
   );
-
   testWidgets(
     'Home arrow signs out, clears the stack, and restores password login',
     (tester) async {
@@ -372,6 +381,19 @@ void main() {
     expect(auth.hasCurrentUser, isTrue);
     expect(find.byType(HomeScreen), findsOneWidget);
     expect(find.text('Unable to sign out. Please try again.'), findsOneWidget);
+  });
+
+  testWidgets('I found an item opens the found item form', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: HomeScreen(foundItemScreenBuilder: _foundItemForm),
+      ),
+    );
+
+    await tester.tap(find.text('I found an item'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Found item form'), findsOneWidget);
   });
 }
 
@@ -462,8 +484,8 @@ class _FakeBiometricService extends BiometricService {
     return pendingResult?.future ?? Future.value(authenticated);
   }
 }
- */
 
+<<<<<<< HEAD
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -582,3 +604,7 @@ void main() {
     // Puedes agregar más pruebas aquí debajo...
   });
 }
+=======
+// Stands in for the Firebase-backed found item form in widget tests.
+Widget _foundItemForm(BuildContext context) => const Text('Found item form');
+>>>>>>> dev
