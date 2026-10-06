@@ -17,7 +17,6 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   final _categoryController = TextEditingController();
   final _emailController = TextEditingController();
 
-  // Color amarillo característico de la interfaz de UniAndes
   static const Color uniandesYellow = Color(0xFFFFF200);
 
   @override
@@ -162,7 +161,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
               ),
               const SizedBox(height: 20),
 
-              // --- SECCIÓN DE UBICACIÓN INTELIGENTE (GPS + Campus) ---
+            
               const Text(
                 'Ubicación en el Campus',
                 style: TextStyle(
@@ -179,7 +178,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                       backgroundColor: uniandesYellow,
                     )
                   : DropdownButtonFormField<CampusLocation>(
-                      isExpanded: true, // <-- CORRIGE EL OVERFLOW HORIZONTAL
+                      isExpanded: true, // no overflow horizontal de la sugerencia
                       value: viewModel.selectedLocation,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
@@ -197,7 +196,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                             isClosest
                                 ? '${loc.name} (Sugerido - Más cercano)'
                                 : loc.name,
-                            overflow: TextOverflow.ellipsis, // <-- MUESTRA "..." SI ES MUY LARGO
+                            overflow: TextOverflow.ellipsis, 
                             maxLines: 1,
                             style: TextStyle(
                               fontWeight: isClosest
