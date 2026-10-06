@@ -23,9 +23,34 @@ class CampusLocation {
 }
 
 const List<CampusLocation> defaultUniandesLocations = [
-  CampusLocation(id: 'ML', name: 'Edificio Mario Laserna (ML)', latitude: 4.6014, longitude: -74.0661),
-  CampusLocation(id: 'W', name: 'Edificio Carlos Angulo Rueda (W)', latitude: 4.6022, longitude: -74.0652),
-  CampusLocation(id: 'SD', name: 'Edificio Santo Domingo (SD)', latitude: 4.6010, longitude: -74.0658),
-  CampusLocation(id: 'RGD', name: 'Edificio Alberto Lleras Camargo (RGD)', latitude: 4.6028, longitude: -74.0655),
-  CampusLocation(id: 'LL', name: 'Edificio Lleras (LL)', latitude: 4.6025, longitude: -74.0660),
+  CampusLocation(
+    id: 'ML',
+    name: 'Edificio Mario Laserna (ML)',
+    latitude: 4.601489,
+    longitude: -74.066125,
+  ),
+  CampusLocation(
+    id: 'W',
+    name: 'Edificio Carlos Angulo Rueda (W)',
+    latitude: 4.602280,
+    longitude: -74.065260,
+  ),
+  CampusLocation(
+    id: 'SD',
+    name: 'Edificio Santo Domingo (SD)',
+    latitude: 4.600980,
+    longitude: -74.065830,
+  ),
+  CampusLocation(
+    id: 'RGD',
+    name: 'Edificio Alberto Lleras Camargo (RGD)',
+    latitude: 4.602790,
+    longitude: -74.065480,
+  ),
+  CampusLocation(
+    id: 'LL',
+    name: 'Edificio Lleras (LL)',
+    latitude: 4.602490,
+    longitude: -74.065980,
+  ),
 ];

@@ -1,19 +1,23 @@
+import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import '../models/campus_locations.dart';
 
 class LocationService {
-  /// Obtiene la ubicación GPS actual del dispositivo verificando permisos
-  Future<Position> getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  // Se pasa al compilar: --dart-define=GOOGLE_MAPS_API_KEY=...
+  // Sin key se ordena localmente por Haversine.
+  static const String _googleApiKey = String.fromEnvironment(
+    'GOOGLE_MAPS_API_KEY',
+  );
 
-    // 1. Verificar si los servicios de localización están activados en el teléfono
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  /// Obtiene la ubicación GPS actual con máxima precisión
+  Future<Position> getCurrentLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       return Future.error('Los servicios de ubicación están desactivados.');
     }
 
-    // 2. Verificar los permisos de la aplicación
-    permission = await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
@@ -23,14 +27,87 @@ class LocationService {
 
     if (permission == LocationPermission.deniedForever) {
       return Future.error(
-        'Los permisos de ubicación están denegados permanentemente. Habilítalos en los ajustes del teléfono.',
+        'Los permisos de ubicación están denegados permanentemente.',
       );
     }
 
-    // 3. Obtener y retornar la posición actual
     return await Geolocator.getCurrentPosition(
-      // ignore: deprecated_member_use
-      desiredAccuracy: LocationAccuracy.high,
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.best,
+        timeLimit: Duration(seconds: 10),
+      ),
     );
+  }
+
+  /// Calcula la distancia real desde el GPS a cada edificio usando Google Maps Distance Matrix API
+  Future<List<CampusLocation>> sortLocationsByGoogleMaps({
+    required double userLat,
+    required double userLng,
+    required List<CampusLocation> locations,
+  }) async {
+    if (locations.isEmpty) return locations;
+    if (_googleApiKey.isEmpty) {
+      return _sortLocally(userLat, userLng, locations);
+    }
+
+    // Construir lista de destinos "lat,lng|lat,lng|..."
+    final destinations = locations
+        .map((loc) => '${loc.latitude},${loc.longitude}')
+        .join('|');
+
+    final url = Uri.parse(
+      'https://maps.googleapis.com/maps/api/distancematrix/json'
+      '?origins=$userLat,$userLng'
+      '&destinations=$destinations'
+      '&mode=walking'
+      '&key=$_googleApiKey',
+    );
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        if (data['status'] == 'OK' &&
+            data['rows'] != null &&
+            (data['rows'] as List).isNotEmpty) {
+          final elements = data['rows'][0]['elements'] as List;
+
+          List<MapEntry<CampusLocation, int>> locationWithDistances = [];
+
+          for (int i = 0; i < locations.length; i++) {
+            final element = elements[i];
+            if (element['status'] == 'OK') {
+              final distanceInMeters = element['distance']['value'] as int;
+              locationWithDistances.add(MapEntry(locations[i], distanceInMeters));
+            } else {
+              // Si falla un elemento específico, usamos el cálculo local como fallback
+              final fallbackDist = locations[i].distanceTo(userLat, userLng).toInt();
+              locationWithDistances.add(MapEntry(locations[i], fallbackDist));
+            }
+          }
+
+          // Ordenar de menor a mayor distancia
+          locationWithDistances.sort((a, b) => a.value.compareTo(b.value));
+          return locationWithDistances.map((e) => e.key).toList();
+        }
+      }
+    } catch (_) {
+      // Si falla la red o la API, fallback a ordenamiento local por Haversine
+    }
+
+    // Fallback local en caso de error
+    return _sortLocally(userLat, userLng, locations);
+  }
+
+  List<CampusLocation> _sortLocally(
+    double userLat,
+    double userLng,
+    List<CampusLocation> locations,
+  ) {
+    final sortedList = List<CampusLocation>.from(locations);
+    sortedList.sort((a, b) =>
+        a.distanceTo(userLat, userLng).compareTo(b.distanceTo(userLat, userLng)));
+    return sortedList;
   }
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../viewmodels/item_viewmodel.dart';
-import '../models/campus_locations.dart'; // <-- Importa el modelo de ubicación
+import '../models/campus_locations.dart';
 
 class ReportItemScreen extends StatefulWidget {
   const ReportItemScreen({super.key, required this.reportType})
@@ -20,11 +20,11 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   final _descriptionController = TextEditingController();
   final _categoryController = TextEditingController();
 
+  static const Color uniandesYellow = Color(0xFFFFF200);
+
   @override
   void initState() {
     super.initState();
-    // Carga la ubicación del GPS y ordena los edificios por cercanía al abrir la pantalla
-    // Usamos addPostFrameCallback para asegurarnos de que el contexto esté listo para llamar al ViewModel
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ItemViewModel>().loadPrioritizedLocations();
     });
@@ -51,8 +51,10 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
+              backgroundColor: Colors.black,
               content: Text(
                 'Objeto reportado con éxito con ubicación del campus',
+                style: TextStyle(color: Colors.white),
               ),
             ),
           );
@@ -60,6 +62,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
+              backgroundColor: Colors.red[700],
               content: Text(viewModel.errorMessage ?? 'Error al guardar'),
             ),
           );
@@ -70,7 +73,6 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Escuchamos el ViewModel para reaccionar a cambios de estado
     final viewModel = context.watch<ItemViewModel>();
 
     return Scaffold(
@@ -112,15 +114,22 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
               ),
               const SizedBox(height: 20),
 
-              // --- SECCIÓN DE UBICACIÓN INTELIGENTE (GPS + Campus) ---
+            
               const Text(
                 'Ubicación en el Campus',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
               ),
               const SizedBox(height: 8),
 
               viewModel.isLoadingLocation
-                  ? const LinearProgressIndicator() // Muestra barra de carga mientras el GPS calcula el más cercano
+                  ? const LinearProgressIndicator(
+                      color: Colors.black,
+                      backgroundColor: uniandesYellow,
+                    )
                   : DropdownButtonFormField<CampusLocation>(
                       value: viewModel.selectedLocation,
                       // Long building names are cut with "..." instead of
@@ -128,10 +137,14 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                       isExpanded: true,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.location_on),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.black, width: 2),
+                        ),
+                        prefixIcon: Icon(Icons.location_on, color: Colors.black),
                       ),
                       items: viewModel.locations.map((loc) {
-                        final bool isClosest = loc == viewModel.locations.first;
+                        final bool isClosest =
+                            loc == viewModel.locations.first;
                         return DropdownMenuItem<CampusLocation>(
                           value: loc,
                           child: Text(
@@ -143,9 +156,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                               fontWeight: isClosest
                                   ? FontWeight.bold
                                   : FontWeight.normal,
-                              color: isClosest
-                                  ? Colors.blue[800]
-                                  : Colors.black87,
+                              color: isClosest ? Colors.black : Colors.black87,
                             ),
                           ),
                         );
@@ -158,10 +169,30 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
               const SizedBox(height: 24),
 
               viewModel.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: () => _submitForm(viewModel),
-                      child: const Text('Guardar Reporte'),
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Colors.black),
+                    )
+                  : SizedBox(
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: uniandesYellow,
+                          foregroundColor: Colors.black,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: Colors.black, width: 1.5),
+                          ),
+                        ),
+                        onPressed: () => _submitForm(viewModel),
+                        child: const Text(
+                          'Guardar Reporte',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
             ],
           ),

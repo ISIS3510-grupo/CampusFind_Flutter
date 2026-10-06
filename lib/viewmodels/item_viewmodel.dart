@@ -26,11 +26,10 @@ class ItemViewModel extends ChangeNotifier {
   bool isLoadingLocation = false;
   String? errorMessage;
 
-  // Lista de ubicaciones del campus y la seleccionada actualmente
   List<CampusLocation> locations = defaultUniandesLocations;
   CampusLocation? selectedLocation;
 
-  /// Carga la ubicación GPS actual y reordena el listado de edificios por cercanía
+  /// Carga la ubicación GPS actual y prioriza mediante Google Maps API
   Future<void> loadPrioritizedLocations() async {
     isLoadingLocation = true;
     notifyListeners();
@@ -38,16 +37,12 @@ class ItemViewModel extends ChangeNotifier {
     try {
       Position position = await _locationService.getCurrentLocation();
 
-      final sortedList = List<CampusLocation>.from(defaultUniandesLocations);
-      sortedList.sort((a, b) {
-        final distA = a.distanceTo(position.latitude, position.longitude);
-        final distB = b.distanceTo(position.latitude, position.longitude);
-        return distA.compareTo(distB);
-      });
-
-      locations = sortedList;
+      locations = await _locationService.sortLocationsByGoogleMaps(
+        userLat: position.latitude,
+        userLng: position.longitude,
+        locations: defaultUniandesLocations,
+      );
     } catch (_) {
-      // Si falla el GPS o deniegan permisos, dejamos el orden por defecto
       locations = defaultUniandesLocations;
     } finally {
       selectedLocation = locations.isNotEmpty ? locations.first : null;
@@ -56,13 +51,11 @@ class ItemViewModel extends ChangeNotifier {
     }
   }
 
-  /// Actualiza la ubicación seleccionada manualmente por el usuario en el formulario
   void selectLocation(CampusLocation? location) {
     selectedLocation = location;
     notifyListeners();
   }
 
-  // Solo se encarga de empaquetar la ubicación y guardar el reporte
   Future<bool> reportItem({
     required String reportType,
     required String title,
