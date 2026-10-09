@@ -11,9 +11,7 @@ class NotificationsScreen extends StatelessWidget {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notificaciones'),
-      ),
+      appBar: AppBar(title: const Text('Notificaciones')),
       body: StreamBuilder<QuerySnapshot>(
         // Escuchamos en tiempo real la colección 'notifications' creada por el backend
         stream: FirebaseFirestore.instance
@@ -37,18 +35,29 @@ class NotificationsScreen extends StatelessWidget {
             itemCount: docs.length,
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
-              final notification = NotificationModel.fromFirestore(data, docs[index].id);
+              final notification = NotificationModel.fromFirestore(
+                data,
+                docs[index].id,
+              );
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ListTile(
-                  leading: const Icon(Icons.notifications_active, color: Colors.blue),
-                  title: Text('Coincidencia encontrada (Match: ${notification.matchId})'),
+                  leading: const Icon(
+                    Icons.notifications_active,
+                    color: Colors.blue,
+                  ),
+                  title: Text(
+                    'Coincidencia encontrada (Match: ${notification.matchId})',
+                  ),
                   subtitle: Text('Canal: ${notification.channel}'),
                   trailing: notification.sentAt != null
                       ? Text(
                           '${notification.sentAt!.hour}:${notification.sentAt!.minute}',
-                          style: const TextStyle(color: Colors.grey, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
                         )
                       : null,
                 ),

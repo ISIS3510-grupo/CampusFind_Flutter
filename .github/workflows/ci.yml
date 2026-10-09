@@ -47,7 +47,7 @@ jobs:
             total=$(grep -c '^DA:' coverage/lcov.info || true)
             hit=$(grep '^DA:' coverage/lcov.info | grep -vc ',0$' || true)
             pct=$(awk -v h="$hit" -v t="$total" 'BEGIN { if (t > 0) printf "%.1f", 100*h/t; else print "0" }')
-            echo "### Line coverage: ${pct}% (${hit}/${total} lines)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Line coverage: ${pct}% (${hit}/${total} lines) - informative, not required" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload coverage report
@@ -62,3 +62,44 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # Blocks the PR only for new bugs or vulnerabilities. The Sonar quality
+      # gate ("Sonar way", the only one allowed in the free plan) also fails on
+      # code smells and duplication, so it stays informative.
+      - name: Block on new bugs or vulnerabilities
+        if: github.event_name == 'pull_request'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          api="https://sonarcloud.io/api"
+          project=$(grep '^sonar.projectKey=' sonar-project.properties | cut -d= -f2)
+          task_url=$(grep '^ceTaskUrl=' .scannerwork/report-task.txt | cut -d= -f2-)
+
+          # Waits until SonarQube Cloud finishes processing this analysis.
+          for _ in $(seq 1 60); do
+            status=$(curl -sf -u "$SONAR_TOKEN:" "$task_url" | jq -r '.task.status')
+            [ "$status" = "SUCCESS" ] && break
+            if [ "$status" = "FAILED" ] || [ "$status" = "CANCELED" ]; then
+              echo "::error::SonarQube Cloud analysis $status"; exit 1
+            fi
+            sleep 5
+          done
+          [ "$status" = "SUCCESS" ] || { echo "::error::Timed out waiting for SonarQube Cloud"; exit 1; }
+
+          issues=$(curl -sf -u "$SONAR_TOKEN:" \
+            "$api/issues/search?componentKeys=$project&pullRequest=$PR_NUMBER&types=BUG,VULNERABILITY&resolved=false&ps=100")
+          bugs=$(echo "$issues" | jq '[.issues[] | select(.type == "BUG")] | length')
+          vulns=$(echo "$issues" | jq '[.issues[] | select(.type == "VULNERABILITY")] | length')
+
+          {
+            echo "### SonarQube Cloud: new bugs: $bugs, new vulnerabilities: $vulns"
+            echo "$issues" | jq -r '.issues[] | "- **\(.type)** \(.component | split(":")[1]):\(.line // "-") \(.message)"'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$bugs" -gt 0 ] || [ "$vulns" -gt 0 ]; then
+            echo "::error::This PR introduces $bugs bug(s) and $vulns vulnerability(ies). See the job summary or SonarQube Cloud."
+            exit 1
+          fi
+          echo "No new bugs or vulnerabilities."
