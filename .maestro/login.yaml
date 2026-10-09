@@ -1,0 +1,16 @@
+# Subflow: signs in a student. Credentials come from env vars, never the repo:
+#   maestro test -e EMAIL=... -e PASSWORD=... .maestro/<flow>.yaml
+appId: com.campusfind.flutter
+---
+- launchApp:
+    clearState: true
+- tapOn: "Enter with Uniandes"
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible: "What do you need?"
+    timeout: 20000

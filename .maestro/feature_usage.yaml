@@ -1,0 +1,13 @@
+# Type 3 BQ: uses Home actions so the app records featureUsageEvents.
+appId: com.campusfind.flutter
+---
+- runFlow: login.yaml
+- tapOn: "Search found items.*"
+- tapOn: "Search found items.*"
+- runFlow: fill_lost_report.yaml
+- scrollUntilVisible:
+    element: "Send report"
+- tapOn: "Send report"
+- extendedWaitUntil:
+    visible: "Report sent. We will let you know if we find it."
+    timeout: 20000
