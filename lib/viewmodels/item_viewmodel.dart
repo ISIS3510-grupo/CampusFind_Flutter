@@ -17,30 +17,46 @@ class ItemViewModel extends ChangeNotifier {
   List<CampusLocation> locations = defaultUniandesLocations;
   CampusLocation? selectedLocation;
 
-  /// Carga la ubicación GPS actual y prioriza mediante Google Maps API
-  Future<void> loadPrioritizedLocations() async {
-    isLoadingLocation = true;
-    notifyListeners();
 
-    try {
-      Position position = await _locationService.getCurrentLocation();
+ String? locationMessage; // mensaje para mostrar en la UI
 
-      // Consulta Google Maps API para reordenar por distancia peatonal/real
-      final sortedList = await _locationService.sortLocationsByGoogleMaps(
-        userLat: position.latitude,
-        userLng: position.longitude,
-        locations: defaultUniandesLocations,
-      );
+Future<void> loadPrioritizedLocations() async {
+  isLoadingLocation = true;
+  locationMessage = null;
+  notifyListeners();
 
-      locations = sortedList;
-    } catch (_) {
-      locations = defaultUniandesLocations;
-    } finally {
-      selectedLocation = locations.isNotEmpty ? locations.first : null;
-      isLoadingLocation = false;
-      notifyListeners();
+  final position = await _locationService.getCurrentLocation();
+
+  if (position == null) {
+    selectedLocation = null;
+    locationMessage =
+        'No pudimos obtener tu ubicación. Selecciona el edificio manualmente.';
+  } else {
+    final nearest = _locationService.findNearestLocation(
+      userLat: position.latitude,
+      userLng: position.longitude,
+      locations: locations,
+    );
+
+    if (nearest == null) {
+      selectedLocation = null;
+    } else {
+      double distance =
+          nearest.distanceTo(position.latitude, position.longitude);
+
+      if (distance <= LocationService.maxDistanceToCampusMeters) {
+        selectedLocation = nearest;
+      } else {
+        selectedLocation = null;
+        locationMessage =
+            'Parece que no estás en el campus. Selecciona el edificio manualmente.';
+      }
     }
   }
+
+  isLoadingLocation = false;
+  notifyListeners();
+}
 
   void selectLocation(CampusLocation? location) {
     selectedLocation = location;

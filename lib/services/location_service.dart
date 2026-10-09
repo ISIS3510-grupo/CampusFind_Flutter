@@ -1,4 +1,4 @@
-import 'dart:convert';
+/* import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../models/campus_locations.dart';
@@ -94,5 +94,63 @@ class LocationService {
     sortedList.sort((a, b) =>
         a.distanceTo(userLat, userLng).compareTo(b.distanceTo(userLat, userLng)));
     return sortedList;
+  }
+}
+ */
+
+import 'package:geolocator/geolocator.dart';
+import '../models/campus_locations.dart';
+
+class LocationService {
+  // Si el usuario está más lejos que esto del edificio más cercano,
+  // se considera fuera del campus y no se sugiere nada.
+  static const double maxDistanceToCampusMeters = 400;
+
+  // Devuelve la posición del GPS, o null si no se pudo obtener.
+  Future<Position?> getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        return null;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      return position;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Devuelve el edificio más cercano (distancia en línea recta).
+  CampusLocation? findNearestLocation({
+    required double userLat,
+    required double userLng,
+    required List<CampusLocation> locations,
+  }) {
+    CampusLocation? nearest;
+    double minDistance = double.infinity;
+
+    for (int i = 0; i < locations.length; i++) {
+      double distance = locations[i].distanceTo(userLat, userLng);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = locations[i];
+      }
+    }
+    return nearest;
   }
 }
