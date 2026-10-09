@@ -22,6 +22,8 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
 
   static const Color uniandesYellow = Color(0xFFFFF200);
 
+  static const Color uniandesYellow = Color(0xFFFFF200);
+
   @override
   void initState() {
     super.initState();
@@ -131,6 +133,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                       backgroundColor: uniandesYellow,
                     )
                   : DropdownButtonFormField<CampusLocation>(
+                      isExpanded: true, // no overflow horizontal de la sugerencia
                       value: viewModel.selectedLocation,
                       // Long building names are cut with "..." instead of
                       // overflowing the form on small screens.
