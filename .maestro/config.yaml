@@ -4,3 +4,4 @@ flows:
   - report_with_private_detail.yaml
   - lost_item_photo.yaml
   - offline_queue.yaml
+  - feature_usage.yaml

@@ -50,7 +50,6 @@ void main() {
         description: 'Perdida cerca a ML',
         category: 'Accesorios',
         location: geoPoint,
-        userEmail: 'estudiante@uniandes.edu.co',
         createdAt: now,
       );
 
@@ -64,7 +63,7 @@ void main() {
       expect(map['description'], 'Perdida cerca a ML');
       expect(map['category'], 'Accesorios');
       expect(map['location'], isA<GeoPoint>());
-      expect(map['userEmail'], 'estudiante@uniandes.edu.co');
+      expect(map.containsKey('userEmail'), isFalse);
       expect(map['createdAt'], now);
     });
 
@@ -76,7 +75,6 @@ void main() {
         description: 'Olvidada en el SD',
         category: 'Otros',
         location: geoPoint,
-        userEmail: 'estudiante@uniandes.edu.co',
       );
 
       final map = item.toMap();

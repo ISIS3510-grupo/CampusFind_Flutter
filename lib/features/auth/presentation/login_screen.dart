@@ -1,102 +1,134 @@
 import 'package:flutter/material.dart';
 
+import '../../analytics/presentation/analytics_dashboard_screen.dart';
+import '../../analytics/presentation/feature_usage_panel.dart';
 import '../../home/presentation/home_screen.dart';
 import '../data/auth_service.dart';
 import '../data/biometric_service.dart';
+import '../viewmodel/auth_view_model.dart';
 import '../../../utils/email_validator.dart';
-import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
-import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
-import 'package:campusfind_flutter/features/auth/data/biometric_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     this.authService = const AuthService(),
     this.biometricService,
+    this.homeBuilder,
+    this.staffDashboardBuilder,
+    this.viewModel,
   });
 
   final AuthService authService;
   final BiometricService? biometricService;
+  final WidgetBuilder? homeBuilder;
+  final WidgetBuilder? staffDashboardBuilder;
+  // Injected ViewModels remain owned by the caller.
+  final AuthViewModel? viewModel;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  late final _biometricService = widget.biometricService ?? BiometricService();
-  bool _checkingAccess = false;
+  late final AuthViewModel _viewModel;
+  late final bool _ownsViewModel;
+  bool _showingSignInDialog = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsViewModel = widget.viewModel == null;
+    _viewModel =
+        widget.viewModel ??
+        AuthViewModel(
+          authService: widget.authService,
+          biometricService: widget.biometricService,
+        );
+  }
+
+  @override
+  void dispose() {
+    if (_ownsViewModel) _viewModel.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleStudentAccess() async {
-    if (_checkingAccess) return;
-    setState(() => _checkingAccess = true);
-
-    try {
-      if (!widget.authService.hasCurrentUser) {
-        await _showSignInDialog();
-        return;
-      }
-
-      final available = await _biometricService.canAuthenticate();
-      if (!mounted) return;
-      if (!available) {
-        await _showSignInDialog();
-        return;
-      }
-
-      final authenticated = await _biometricService.authenticate();
-      if (!mounted) return;
-      if (authenticated != true) {
-        // A failed or cancelled prompt cannot continue to the role check.
-        await _showSignInDialog();
-        return;
-      }
-      if (!widget.authService.hasCurrentUser) {
-        await _showSignInDialog();
-        return;
-      }
-
-      // Existing Firebase session is still validated as a student.
-      final error = await widget.authService.verifyStudentRole();
-      if (!mounted) return;
-      if (error == null) {
-        _openHome();
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error)));
-      }
-    } catch (_) {
-      if (mounted) await _showSignInDialog();
-    } finally {
-      if (mounted) setState(() => _checkingAccess = false);
+    if (_viewModel.isBusy || _showingSignInDialog) return;
+    await _viewModel.requestStudentAccess();
+    if (!mounted) return;
+    if (_viewModel.needsPasswordSignIn) {
+      await _showSignInDialog();
+    } else if (_viewModel.isAuthenticated) {
+      _openHome();
+    } else if (_viewModel.errorMessage != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(_viewModel.errorMessage!)));
     }
   }
 
-  Future<void> _showSignInDialog() async {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    final signedIn = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) =>
-          _StudentSignInDialog(authService: widget.authService),
-    );
+  Future<void> _handleStaffAccess() async {
+    if (_viewModel.isBusy || _showingSignInDialog) return;
+    _viewModel.clearError();
+    await _showSignInDialog(isStaff: true);
+  }
 
-    if (signedIn == true && mounted) {
-      _openHome();
+  Future<void> _showSignInDialog({bool isStaff = false}) async {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    setState(() => _showingSignInDialog = true);
+    try {
+      final signedIn = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) =>
+            _SignInDialog(viewModel: _viewModel, isStaff: isStaff),
+      );
+      if (signedIn == true && mounted) {
+        if (isStaff) {
+          _openStaffDashboard();
+        } else {
+          _openHome();
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _showingSignInDialog = false);
     }
   }
 
   void _openHome() {
+    final authService = _viewModel.authService;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (context) => HomeScreen(authService: widget.authService),
+        builder:
+            widget.homeBuilder ??
+            (context) => HomeScreen(authService: authService),
+      ),
+    );
+  }
+
+  void _openStaffDashboard() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder:
+            widget.staffDashboardBuilder ??
+            (context) => const AnalyticsDashboardScreen(
+              // Jhostin's Type 3 BQ, next to the bottleneck and timing BQs.
+              additionalPanels: [FeatureUsagePanel()],
+            ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, child) => _buildLogin(context),
+    );
+  }
+
+  Widget _buildLogin(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -199,7 +231,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: _checkingAccess
+                        onPressed: _viewModel.isBusy || _showingSignInDialog
                             ? null
                             : _handleStudentAccess,
                         style: ElevatedButton.styleFrom(
@@ -219,11 +251,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // Visual placeholder for staff access
+                    // Staff uses the same email/password dialog with admin validation.
                     SizedBox(
                       height: 48,
                       child: OutlinedButton(
-                        onPressed: () {},
+                        onPressed: _viewModel.isBusy || _showingSignInDialog
+                            ? null
+                            : _handleStaffAccess,
                         style: OutlinedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.black,
@@ -267,20 +301,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _StudentSignInDialog extends StatefulWidget {
-  const _StudentSignInDialog({required this.authService});
+class _SignInDialog extends StatefulWidget {
+  const _SignInDialog({required this.viewModel, required this.isStaff});
 
-  final AuthService authService;
+  final AuthViewModel viewModel;
+  final bool isStaff;
 
   @override
-  State<_StudentSignInDialog> createState() => _StudentSignInDialogState();
+  State<_SignInDialog> createState() => _SignInDialogState();
 }
 
-class _StudentSignInDialogState extends State<_StudentSignInDialog> {
+class _SignInDialogState extends State<_SignInDialog> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isSigningIn = false;
-  String? _errorMessage;
+  String? _validationMessage;
 
   @override
   void dispose() {
@@ -290,56 +324,63 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
   }
 
   Future<void> _signIn() async {
-    if (_isSigningIn) return;
+    if (widget.viewModel.isBusy) return;
 
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
-    // 1. Validar campos vacíos
-    if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'Please enter your email and password.');
+    if (_emailController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty) {
+      setState(
+        () => _validationMessage = 'Please enter your email and password.',
+      );
       return;
     }
 
-    // 2. Interceptar y validar el correo de Uniandes antes de ir a Firebase
-    final emailValidationError = EmailValidator.validateUniandesEmail(email);
-    if (emailValidationError != null) {
-      setState(() => _errorMessage = emailValidationError);
-      return; // Se detiene aquí y no llama al backend
+    // Rejects non-Uniandes emails before calling Firebase (Sofia).
+    final emailError = EmailValidator.validateUniandesEmail(
+      _emailController.text.trim(),
+    );
+    if (emailError != null) {
+      setState(() => _validationMessage = emailError);
+      return;
     }
 
-    setState(() {
-      _isSigningIn = true;
-      _errorMessage = null;
-    });
+    setState(() => _validationMessage = null);
 
-    // 3. Consulta a Firebase solo si pasó la validación local
-    final error = await widget.authService.signInStudent(email, password);
+    final signIn = widget.isStaff
+        ? widget.viewModel.signInAdmin
+        : widget.viewModel.signInStudent;
+    final signedIn = await signIn(
+      _emailController.text,
+      _passwordController.text,
+    );
     if (!mounted) return;
 
-    if (error == null) {
+    if (signedIn) {
       Navigator.of(context).pop(true);
-    } else {
-      setState(() {
-        _isSigningIn = false;
-        _errorMessage = error;
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.viewModel,
+      builder: (context, child) => _buildDialog(context),
+    );
+  }
+
+  Widget _buildDialog(BuildContext context) {
+    final isSigningIn = widget.viewModel.isBusy;
+    final errorMessage = _validationMessage ?? widget.viewModel.errorMessage;
     return PopScope(
-      canPop: !_isSigningIn,
+      canPop: !isSigningIn,
       child: AlertDialog(
-        title: const Text('Student sign in'),
+        title: Text(widget.isStaff ? 'Staff sign in' : 'Student sign in'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: _emailController,
-                enabled: !_isSigningIn,
+                enabled: !isSigningIn,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 autocorrect: false,
@@ -348,7 +389,7 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
-                enabled: !_isSigningIn,
+                enabled: !isSigningIn,
                 obscureText: true,
                 autocorrect: false,
                 enableSuggestions: false,
@@ -356,10 +397,10 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
                 onSubmitted: (_) => _signIn(),
                 decoration: const InputDecoration(labelText: 'Password'),
               ),
-              if (_errorMessage != null) ...[
+              if (errorMessage != null) ...[
                 const SizedBox(height: 16),
                 Text(
-                  _errorMessage!,
+                  errorMessage,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ],
@@ -368,12 +409,12 @@ class _StudentSignInDialogState extends State<_StudentSignInDialog> {
         ),
         actions: [
           TextButton(
-            onPressed: _isSigningIn ? null : () => Navigator.of(context).pop(),
+            onPressed: isSigningIn ? null : () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: _isSigningIn ? null : _signIn,
-            child: _isSigningIn
+            onPressed: isSigningIn ? null : _signIn,
+            child: isSigningIn
                 ? const SizedBox(
                     width: 20,
                     height: 20,

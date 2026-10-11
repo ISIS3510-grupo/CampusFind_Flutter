@@ -1,20 +1,65 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/item_model.dart';
 
 class ItemDao {
-  // Referencia a la colección 'items' en Firestore
-  final CollectionReference _itemsCollection = FirebaseFirestore.instance
-      .collection('items');
+  const ItemDao({this.firestore});
+
+  final FirebaseFirestore? firestore;
 
   /// Inserta un nuevo objeto reportado en Firestore
-  Future<void> insertItem(ItemModel item) async {
-    await _itemsCollection.add(item.toMap());
+  Future<void> insertItem(
+    ItemModel item, {
+    required String reportType,
+    required String userUid,
+    String? locationName,
+  }) async {
+    if (reportType != 'found' && reportType != 'lost') {
+      throw ArgumentError.value(
+        reportType,
+        'reportType',
+        'Expected found or lost',
+      );
+    }
+    if (userUid.trim().isEmpty) throw ArgumentError('A user UID is required.');
+
+    final database = firestore ?? FirebaseFirestore.instance;
+    final fields = <String, dynamic>{
+      'category': item.category,
+      'title': item.title,
+      'locationName': locationName ?? 'Current location',
+      'latitude': item.location.latitude,
+      'longitude': item.location.longitude,
+    };
+    if (reportType == 'found') {
+      await database.collection('foundItems').add({
+        ...fields,
+        'reporterUid': userUid,
+        'publicDescription': item.description,
+        'status': 'available',
+        'semesterId': await _currentSemesterId(database),
+        'donationEligible': false,
+        // The rules only accept 'none' when a found item is created.
+        'donationStatus': 'none',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } else {
+      await database.collection('lostReports').add({
+        ...fields,
+        'ownerUid': userUid,
+        'description': item.description,
+        'status': 'reported',
+        'reportedAt': FieldValue.serverTimestamp(),
+        'statusChangedAt': FieldValue.serverTimestamp(),
+      });
+    }
   }
 
-  /// Obtiene todos los objetos reportados como un Stream en tiempo real
-  Stream<List<ItemModel>> getAllItems() {
-    return _itemsCollection.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => ItemModel.fromSnapshot(doc)).toList();
-    });
+  Future<String> _currentSemesterId(FirebaseFirestore database) async {
+    final config = await database.collection('appConfig').doc('general').get();
+    final semester = config.data()?['currentSemesterId'];
+    return semester is String && RegExp(r'^\d{4}-[12]$').hasMatch(semester)
+        ? semester
+        : '2026-2';
   }
 }
