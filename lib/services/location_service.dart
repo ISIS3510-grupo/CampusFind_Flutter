@@ -1,14 +1,9 @@
-import 'dart:convert';
+import 'dart:async';
+
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
-import '../models/campus_locations.dart';
 
 class LocationService {
-  // Se pasa al compilar: --dart-define=GOOGLE_MAPS_API_KEY=...
-  // Sin key se ordena localmente por Haversine.
-  static const String _googleApiKey = String.fromEnvironment(
-    'GOOGLE_MAPS_API_KEY',
-  );
+  static const _maxLastKnownAge = Duration(minutes: 2);
 
   /// Obtiene la ubicación GPS actual con máxima precisión
   Future<Position> getCurrentLocation() async {
@@ -31,83 +26,24 @@ class LocationService {
       );
     }
 
-    return await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.best,
-        timeLimit: Duration(seconds: 10),
-      ),
-    );
-  }
-
-  /// Calcula la distancia real desde el GPS a cada edificio usando Google Maps Distance Matrix API
-  Future<List<CampusLocation>> sortLocationsByGoogleMaps({
-    required double userLat,
-    required double userLng,
-    required List<CampusLocation> locations,
-  }) async {
-    if (locations.isEmpty) return locations;
-    if (_googleApiKey.isEmpty) {
-      return _sortLocally(userLat, userLng, locations);
-    }
-
-    // Construir lista de destinos "lat,lng|lat,lng|..."
-    final destinations = locations
-        .map((loc) => '${loc.latitude},${loc.longitude}')
-        .join('|');
-
-    final url = Uri.parse(
-      'https://maps.googleapis.com/maps/api/distancematrix/json'
-      '?origins=$userLat,$userLng'
-      '&destinations=$destinations'
-      '&mode=walking'
-      '&key=$_googleApiKey',
-    );
-
     try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
-        if (data['status'] == 'OK' &&
-            data['rows'] != null &&
-            (data['rows'] as List).isNotEmpty) {
-          final elements = data['rows'][0]['elements'] as List;
-
-          List<MapEntry<CampusLocation, int>> locationWithDistances = [];
-
-          for (int i = 0; i < locations.length; i++) {
-            final element = elements[i];
-            if (element['status'] == 'OK') {
-              final distanceInMeters = element['distance']['value'] as int;
-              locationWithDistances.add(MapEntry(locations[i], distanceInMeters));
-            } else {
-              // Si falla un elemento específico, usamos el cálculo local como fallback
-              final fallbackDist = locations[i].distanceTo(userLat, userLng).toInt();
-              locationWithDistances.add(MapEntry(locations[i], fallbackDist));
-            }
-          }
-
-          // Ordenar de menor a mayor distancia
-          locationWithDistances.sort((a, b) => a.value.compareTo(b.value));
-          return locationWithDistances.map((e) => e.key).toList();
-        }
-      }
-    } catch (_) {
-      // Si falla la red o la API, fallback a ordenamiento local por Haversine
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+    } on TimeoutException {
+      // Indoors a fresh fix can take longer than the form should wait. The
+      // last known position carries its own accuracy, so the building
+      // locator still decides whether it is precise enough to use. An old
+      // fix may come from somewhere else, so only a recent one counts.
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      final age = lastKnown == null
+          ? null
+          : DateTime.now().difference(lastKnown.timestamp);
+      if (lastKnown == null || age! > _maxLastKnownAge) rethrow;
+      return lastKnown;
     }
-
-    // Fallback local en caso de error
-    return _sortLocally(userLat, userLng, locations);
-  }
-
-  List<CampusLocation> _sortLocally(
-    double userLat,
-    double userLng,
-    List<CampusLocation> locations,
-  ) {
-    final sortedList = List<CampusLocation>.from(locations);
-    sortedList.sort((a, b) =>
-        a.distanceTo(userLat, userLng).compareTo(b.distanceTo(userLat, userLng)));
-    return sortedList;
   }
 }

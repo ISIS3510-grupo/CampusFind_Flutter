@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../viewmodels/item_viewmodel.dart';
 import '../models/campus_locations.dart';
+import '../services/campus_building_locator.dart';
 
 class ReportItemScreen extends StatefulWidget {
   const ReportItemScreen({super.key, required this.reportType})
@@ -71,6 +72,16 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     }
   }
 
+  /// Label for the building the GPS detected, null for every other one.
+  String? _detectionSuffix(ItemViewModel viewModel, CampusLocation location) {
+    if (location != viewModel.locations.firstOrNull) return null;
+    return switch (viewModel.buildingMatch) {
+      BuildingMatch.inside => 'Estás aquí',
+      BuildingMatch.near => 'Cerca de ti',
+      BuildingMatch.unknown => null,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<ItemViewModel>();
@@ -115,13 +126,26 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
               const SizedBox(height: 20),
 
             
-              const Text(
-                'Ubicación en el Campus',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Ubicación en el Campus',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.my_location, color: Colors.black),
+                    tooltip: 'Detectar edificio',
+                    onPressed: viewModel.isLoadingLocation
+                        ? null
+                        : viewModel.loadPrioritizedLocations,
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
 
@@ -132,6 +156,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                     )
                   : DropdownButtonFormField<CampusLocation>(
                       value: viewModel.selectedLocation,
+                      hint: const Text('Selecciona el edificio'),
                       // Long building names are cut with "..." instead of
                       // overflowing the form on small screens.
                       isExpanded: true,
@@ -141,16 +166,19 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                           borderSide: BorderSide(color: Colors.black, width: 2),
                         ),
                         prefixIcon: Icon(Icons.location_on, color: Colors.black),
+                      ).copyWith(
+                        helperText:
+                            viewModel.buildingMatch == BuildingMatch.unknown
+                            ? 'No pudimos detectar el edificio; elígelo de la lista.'
+                            : null,
                       ),
                       items: viewModel.locations.map((loc) {
-                        final bool isClosest =
-                            loc == viewModel.locations.first;
+                        final suffix = _detectionSuffix(viewModel, loc);
+                        final bool isClosest = suffix != null;
                         return DropdownMenuItem<CampusLocation>(
                           value: loc,
                           child: Text(
-                            isClosest
-                                ? '${loc.name} (Sugerido - Más cercano)'
-                                : loc.name,
+                            isClosest ? '${loc.name} ($suffix)' : loc.name,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontWeight: isClosest

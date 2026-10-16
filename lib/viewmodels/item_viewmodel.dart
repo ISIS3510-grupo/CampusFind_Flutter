@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:geolocator/geolocator.dart';
 
 import '../features/analytics/services/report_registration_performance_tracker.dart';
 import '../models/item_model.dart';
 import '../models/campus_locations.dart';
 import '../DAOs/item_dao.dart';
+import '../services/campus_building_locator.dart';
 import '../services/location_service.dart';
 
 class ItemViewModel extends ChangeNotifier {
@@ -15,12 +15,17 @@ class ItemViewModel extends ChangeNotifier {
     LocationService? locationService,
     this._firebaseAuth,
     this._tracker = const ReportRegistrationPerformanceTracker(),
-  }) : _locationService = locationService ?? LocationService();
+    CampusBuildingLocator? buildingLocator,
+  }) : _locationService = locationService ?? LocationService(),
+       _buildingLocator =
+           buildingLocator ??
+           CampusBuildingLocator(buildings: defaultUniandesLocations);
 
   final ItemDao _itemDao;
   final LocationService _locationService;
   final FirebaseAuth? _firebaseAuth;
   final ReportRegistrationPerformanceTracker _tracker;
+  final CampusBuildingLocator _buildingLocator;
 
   bool isLoading = false;
   bool isLoadingLocation = false;
@@ -29,23 +34,33 @@ class ItemViewModel extends ChangeNotifier {
   List<CampusLocation> locations = defaultUniandesLocations;
   CampusLocation? selectedLocation;
 
-  /// Carga la ubicación GPS actual y prioriza mediante Google Maps API
+  /// How the suggested building was found; [BuildingMatch.unknown] means
+  /// the student has to pick it.
+  BuildingMatch buildingMatch = BuildingMatch.unknown;
+
+  /// Detects the building the student is in from the GPS position and the
+  /// building outlines, and orders the picker by distance.
   Future<void> loadPrioritizedLocations() async {
     isLoadingLocation = true;
     notifyListeners();
 
     try {
-      Position position = await _locationService.getCurrentLocation();
-
-      locations = await _locationService.sortLocationsByGoogleMaps(
-        userLat: position.latitude,
-        userLng: position.longitude,
-        locations: defaultUniandesLocations,
+      final position = await _locationService.getCurrentLocation();
+      final detection = _buildingLocator.locate(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracyMeters: position.accuracy,
       );
+      locations = detection.ranked;
+      buildingMatch = detection.match;
+      // Only a confident detection is preselected; otherwise a wrong
+      // building would be saved silently with the report.
+      selectedLocation = detection.building;
     } catch (_) {
       locations = defaultUniandesLocations;
+      buildingMatch = BuildingMatch.unknown;
+      selectedLocation = null;
     } finally {
-      selectedLocation = locations.isNotEmpty ? locations.first : null;
       isLoadingLocation = false;
       notifyListeners();
     }
