@@ -1,6 +1,5 @@
 import 'package:campusfind_flutter/models/notification_model.dart';
 import 'package:campusfind_flutter/services/match_analytics_service.dart';
-import 'package:campusfind_flutter/views/match_analytics_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -15,21 +14,8 @@ class NotificationsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notificaciones'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.analytics_outlined),
-            tooltip: 'Ver Métricas de Negocio',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MatchAnalyticsScreen(),
-                ),
-              );
-            },
-          ),
-        ],
+        title: const Text('Notifications'),
+        
       ),
       body: StreamBuilder<QuerySnapshot>(
         // Escuchamos en tiempo real la colección 'notifications' creada por el backend
@@ -79,16 +65,19 @@ class NotificationsScreen extends StatelessWidget {
                           ),
                         )
                       : null,
-                  onTap: () => analyticsService.trackMatchReviewed(
-                    notificationId: docs[index].id,
-                    alreadyViewed: data['viewedAt'] != null,
-                  ),
-                ),
+                  onTap: () {
+                    analyticsService.trackMatchReviewed(
+                      notification.id,
+                      notification.viewedAt != null,
+                      );
+                      }
+                    ),
+                );
+            },
               );
             },
-          );
-        },
-      ),
+          ),
     );
+    
+        }
   }
-}
