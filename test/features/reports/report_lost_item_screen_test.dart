@@ -106,7 +106,9 @@ void main() {
   });
 
   Future<void> tapTakePhoto(WidgetTester tester) async {
-    final button = find.text('Take a photo (optional)');
+    final button = find.text(
+      'Take a photo of a similar item, its box or receipt',
+    );
     await tester.scrollUntilVisible(
       button,
       200,
@@ -213,7 +215,9 @@ void main() {
         photoLabeler: FakePhotoLabeler(pending: pending),
       );
 
-      final button = find.text('Take a photo (optional)');
+      final button = find.text(
+        'Take a photo of a similar item, its box or receipt',
+      );
       await scrollTo(tester, button);
       await tester.tap(button);
       await tester.pump();
@@ -227,6 +231,36 @@ void main() {
       expect(find.text('Analyzing the photo...'), findsNothing);
       expect(find.text('Suggested by Google Cloud Vision'), findsNothing);
     });
+  });
+
+  testWidgets('sends a photo chosen from the gallery', (tester) async {
+    final repository = FakeLostReportRepository();
+    final picker = FakePhotoPicker();
+    final labeler = FakePhotoLabeler();
+    await openScreen(
+      tester,
+      repository,
+      photoPicker: picker,
+      photoLabeler: labeler,
+    );
+
+    await fillForm(tester);
+    final button = find.text('Choose from gallery');
+    await tester.scrollUntilVisible(
+      button,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+
+    expect(picker.galleryCalls, 1);
+    expect(picker.calls, 0);
+    expect(labeler.requested, ['/gallery/calculator.jpg']);
+    expect(find.text('Photo added'), findsOneWidget);
+
+    await tapSend(tester);
+    expect(repository.submitted.single.imagePath, '/gallery/calculator.jpg');
   });
 
   testWidgets('sends the photo taken with the camera', (tester) async {
@@ -252,7 +286,10 @@ void main() {
     await tapTakePhoto(tester);
     await tester.tap(find.text('Remove'));
     await tester.pumpAndSettle();
-    expect(find.text('Take a photo (optional)'), findsOneWidget);
+    expect(
+      find.text('Take a photo of a similar item, its box or receipt'),
+      findsOneWidget,
+    );
 
     await tapSend(tester);
     expect(repository.submitted.single.imagePath, isNull);
@@ -271,7 +308,10 @@ void main() {
     await tapTakePhoto(tester);
 
     expect(find.text('Photo added'), findsNothing);
-    expect(find.text('Take a photo (optional)'), findsOneWidget);
+    expect(
+      find.text('Take a photo of a similar item, its box or receipt'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('tells the student when only the photo failed', (tester) async {
