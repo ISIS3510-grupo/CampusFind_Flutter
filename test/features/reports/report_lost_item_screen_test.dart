@@ -1,8 +1,13 @@
 import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_screen.dart';
+
+import 'dart:async';
+
+import 'package:campusfind_flutter/features/reports/domain/photo_suggestion.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_lost_report_repository.dart';
+import 'fake_photo_labeler.dart';
 import 'fake_photo_picker.dart';
 
 void main() {
@@ -10,12 +15,14 @@ void main() {
     WidgetTester tester,
     FakeLostReportRepository repository, {
     FakePhotoPicker? photoPicker,
+    FakePhotoLabeler? photoLabeler,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
         home: ReportLostItemScreen(
           repository: repository,
           photoPicker: photoPicker ?? FakePhotoPicker(),
+          photoLabeler: photoLabeler ?? FakePhotoLabeler(),
         ),
       ),
     );
@@ -109,6 +116,119 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  group('photo suggestion from Google Cloud Vision', () {
+    const backpack = PhotoSuggestion(
+      category: 'electronics',
+      description: 'Black laptop',
+      keywords: ['laptop'],
+    );
+
+    Future<void> scrollTo(WidgetTester tester, Finder finder) =>
+        tester.scrollUntilVisible(
+          finder,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+
+    testWidgets('fills the empty category and description', (tester) async {
+      final repository = FakeLostReportRepository();
+      final labeler = FakePhotoLabeler(
+        suggestion: const PhotoSuggestion(
+          category: 'keys',
+          description: 'Silver keychain',
+        ),
+      );
+      await openScreen(tester, repository, photoLabeler: labeler);
+
+      await tapTakePhoto(tester);
+      expect(labeler.requested, ['/photos/calculator.jpg']);
+      expect(find.text('Suggested by Google Cloud Vision'), findsOneWidget);
+      expect(find.text('Keys · Silver keychain'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Use suggestion'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Use suggestion'));
+      await tester.pumpAndSettle();
+      expect(find.text('Suggested by Google Cloud Vision'), findsNothing);
+
+      // The student only writes what the photo cannot tell.
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextFormField, 'Item'),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Item'),
+        'Keys',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Where did you lose it?'),
+        'ML building',
+      );
+      await tapSend(tester);
+
+      final draft = repository.submitted.single;
+      expect(draft.category, 'keys');
+      expect(draft.description, 'Silver keychain');
+    });
+
+    testWidgets('does not overwrite a description the student wrote', (
+      tester,
+    ) async {
+      final repository = FakeLostReportRepository();
+      await openScreen(
+        tester,
+        repository,
+        photoLabeler: FakePhotoLabeler(suggestion: backpack),
+      );
+      await fillForm(tester);
+
+      await tapTakePhoto(tester);
+      await tester.ensureVisible(find.text('Use suggestion'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Use suggestion'));
+      await tester.pumpAndSettle();
+      await tapSend(tester);
+
+      expect(repository.submitted.single.description, isNot('Black laptop'));
+    });
+
+    testWidgets('without an answer the form stays as it was', (tester) async {
+      final repository = FakeLostReportRepository();
+      await openScreen(tester, repository, photoLabeler: FakePhotoLabeler());
+
+      await tapTakePhoto(tester);
+
+      expect(find.text('Suggested by Google Cloud Vision'), findsNothing);
+      expect(find.text('Analyzing the photo...'), findsNothing);
+      expect(find.text('Photo added'), findsOneWidget);
+    });
+
+    testWidgets('removing the photo discards a late answer', (tester) async {
+      final pending = Completer<PhotoSuggestion?>();
+      final repository = FakeLostReportRepository();
+      await openScreen(
+        tester,
+        repository,
+        photoLabeler: FakePhotoLabeler(pending: pending),
+      );
+
+      final button = find.text('Take a photo (optional)');
+      await scrollTo(tester, button);
+      await tester.tap(button);
+      await tester.pump();
+      expect(find.text('Analyzing the photo...'), findsOneWidget);
+
+      await tester.tap(find.text('Remove'));
+      await tester.pump();
+      pending.complete(backpack);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Analyzing the photo...'), findsNothing);
+      expect(find.text('Suggested by Google Cloud Vision'), findsNothing);
+    });
+  });
+
   testWidgets('sends the photo taken with the camera', (tester) async {
     final repository = FakeLostReportRepository();
     final picker = FakePhotoPicker();
@@ -166,6 +286,7 @@ void main() {
                   builder: (_) => ReportLostItemScreen(
                     repository: repository,
                     photoPicker: FakePhotoPicker(),
+                    photoLabeler: FakePhotoLabeler(),
                   ),
                 ),
               ),

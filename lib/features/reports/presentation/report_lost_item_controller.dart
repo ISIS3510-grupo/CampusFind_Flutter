@@ -1,18 +1,26 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:campusfind_flutter/features/reports/data/photo_labeler.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report_repository.dart';
+import 'package:campusfind_flutter/features/reports/domain/photo_suggestion.dart';
 
 // Keeps the form state; the screen only renders it and forwards user actions.
 class ReportLostItemController extends ChangeNotifier {
-  ReportLostItemController(this._repository);
+  ReportLostItemController(this._repository, {this._photoLabeler});
 
   final LostReportRepository _repository;
+  final PhotoLabeler? _photoLabeler;
+  bool _disposed = false;
 
   List<String> categories = const [];
   bool loadingCategories = true;
   bool submitting = false;
   String? errorMessage;
+  bool analyzingPhoto = false;
+  PhotoSuggestion? photoSuggestion;
+  // Photo being analyzed; a newer photo or removing it discards the answer.
+  String? _analyzedPhoto;
 
   Future<void> loadCategories() async {
     loadingCategories = true;
@@ -21,6 +29,38 @@ class ReportLostItemController extends ChangeNotifier {
     categories = await _repository.getCategories();
     loadingCategories = false;
     notifyListeners();
+  }
+
+  Future<void> analyzePhoto(String photoPath) async {
+    final labeler = _photoLabeler;
+    if (labeler == null) return;
+    _analyzedPhoto = photoPath;
+    photoSuggestion = null;
+    analyzingPhoto = true;
+    _notify();
+
+    final suggestion = await labeler.suggest(photoPath);
+    if (_analyzedPhoto != photoPath) return;
+    photoSuggestion = suggestion;
+    analyzingPhoto = false;
+    _notify();
+  }
+
+  void clearPhotoSuggestion() {
+    _analyzedPhoto = null;
+    photoSuggestion = null;
+    analyzingPhoto = false;
+    _notify();
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   Future<SubmitResult?> submit(LostReportDraft draft) async {
