@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:campusfind_flutter/DAOs/item_dao.dart';
 import 'package:campusfind_flutter/core/data/found_item_repository.dart';
 import 'package:campusfind_flutter/core/data/lost_report_repository.dart';
 import 'package:campusfind_flutter/features/analytics/services/report_registration_performance_tracker.dart';
+import 'package:campusfind_flutter/models/campus_locations.dart';
 import 'package:campusfind_flutter/models/item_model.dart';
 import 'package:campusfind_flutter/services/location_service.dart';
 import 'package:campusfind_flutter/viewmodels/item_viewmodel.dart';
@@ -31,15 +34,14 @@ void main() {
         );
         final metrics = FakeRegistrationMetricRepository();
         final clock = Stopwatch();
-        final gps = _Location(onGet: () => expect(clock.isRunning, isTrue));
-        final model = _model(database, metrics, gps, clock: clock);
+        final model = _model(database, metrics, _Location(), clock: clock);
         addTearDown(model.dispose);
+        model.selectLocation(_building);
         expect(
-          await model.reportItem(
+          await _report(
+            model,
             reportType: type,
-            title: 'Calculator',
             description: 'Black calculator',
-            category: 'electronics',
           ),
           isTrue,
         );
@@ -108,17 +110,15 @@ void main() {
     );
   }
 
-  test('missing auth, invalid type, GPS and write failures create no successful metric', () async {
-    for (final failure in ['auth', 'type', 'gps', 'write']) {
+  test('missing auth, invalid type, no building and write failures create no successful metric', () async {
+    for (final failure in ['auth', 'type', 'building', 'write']) {
       final database = FakeFirestore(
         writeErrors: failure == 'write'
             ? {'lostReports/auto-1': StateError('write failed')}
             : {},
       );
       final metrics = FakeRegistrationMetricRepository();
-      final gps = _Location(
-        error: failure == 'gps' ? StateError('GPS failed') : null,
-      );
+      final gps = _Location();
       final model = _model(
         database,
         metrics,
@@ -126,12 +126,11 @@ void main() {
         authenticated: failure != 'auth',
       );
       addTearDown(model.dispose);
+      if (failure != 'building') model.selectLocation(_building);
       expect(
-        await model.reportItem(
+        await _report(
+          model,
           reportType: failure == 'type' ? 'invalid' : 'lost',
-          title: 'Calculator',
-          description: 'Black',
-          category: 'electronics',
         ),
         isFalse,
         reason: failure,
@@ -140,13 +139,13 @@ void main() {
       expect(model.isLoading, isFalse);
       expect(metrics.records, isEmpty, reason: failure);
       expect(database.documents, isEmpty, reason: failure);
-      if (failure == 'auth' || failure == 'type') expect(gps.calls, 0);
+      // Saving uses the selected building, never a new GPS read.
+      expect(gps.calls, 0, reason: failure);
     }
     final database = FakeFirestore();
     await expectLater(
-      ItemDao(firestore: database)
-          .insertItem(_item(), reportType: 'invalid', userUid: 'student-1'),
-      throwsArgumentError,
+      _insert(ItemDao(firestore: database), reportType: 'invalid'),
+      throwsA('Expected found or lost'),
     );
     expect(database.documentWrites, isEmpty);
   });
@@ -158,8 +157,7 @@ void main() {
           if (value != null) 'appConfig/general': {'currentSemesterId': value},
         },
       );
-      await ItemDao(firestore: database)
-          .insertItem(_item(), reportType: 'found', userUid: 'student-1');
+      await _insert(ItemDao(firestore: database), reportType: 'found');
       expect(database.documents['foundItems/auto-1']!['semesterId'], '2026-2');
     }
   });
@@ -198,6 +196,43 @@ void main() {
   );
 }
 
+const _building = CampusLocation(
+  id: 'ML',
+  name: 'Current location',
+  latitude: 4.6014,
+  longitude: -74.0661,
+);
+
+// reportItem and insertItem answer through callbacks; these helpers turn the
+// callbacks into Futures so each test can await the result.
+Future<bool> _report(
+  ItemViewModel model, {
+  required String reportType,
+  String description = 'Black',
+}) {
+  final done = Completer<bool>();
+  model.reportItem(
+    reportType: reportType,
+    title: 'Calculator',
+    description: description,
+    category: 'electronics',
+    onDone: done.complete,
+  );
+  return done.future;
+}
+
+Future<void> _insert(ItemDao dao, {required String reportType}) {
+  final done = Completer<void>();
+  dao.insertItem(
+    _item(),
+    reportType: reportType,
+    userUid: 'student-1',
+    onSuccess: done.complete,
+    onError: done.completeError,
+  );
+  return done.future;
+}
+
 ItemModel _item() => ItemModel(
   title: 'Calculator',
   description: 'Black',
@@ -227,16 +262,11 @@ ItemViewModel _model(
 }
 
 class _Location extends LocationService {
-  _Location({this.onGet, this.error});
-  final VoidCallback? onGet;
-  final Object? error;
   int calls = 0;
   @override
-  Future<Position> getCurrentLocation() async {
+  void getCurrentLocation(void Function(Position? position) onResult) {
     calls++;
-    onGet?.call();
-    if (error != null) throw error!;
-    return _Position();
+    onResult(_Position());
   }
 }
 
