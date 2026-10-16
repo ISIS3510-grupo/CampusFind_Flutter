@@ -1,3 +1,4 @@
+import 'package:campusfind_flutter/core/widgets/storage_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/data/found_item_repository.dart';
@@ -18,7 +19,6 @@ import '../../analytics/domain/feature_usage_tracker.dart';
 import '../../reports/presentation/report_lost_item_screen.dart';
 import '../../../views/notification_screen.dart';
 import 'widgets/home_action_card.dart';
-
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -369,6 +369,120 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildActiveReportSection(LostReport report) {
+    final location = report.locationName.trim();
+    final age = reportAge(report.reportedAt);
+    final subtitle = location.isEmpty ? age : 'Lost in $location · $age';
+    const placeholder = Center(
+      child: Icon(Icons.image, size: 26, color: Color(0xFF999798)),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 36),
+        const Text(
+          'My active report',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 13),
+        Container(
+          constraints: const BoxConstraints(minHeight: 116),
+          padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFE2DEDE)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 92,
+                  height: 96,
+                  color: const Color(0xFFE2DEDE),
+                  child: StorageImage(
+                    path: report.photoPath,
+                    placeholder: placeholder,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 6),
+                    Text(
+                      report.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w300,
+                        color: Color(0xFF999798),
+                        height: 1.2,
+                      ),
+                    ),
+                    if (_viewModel.bestMatch != null) ...[
+                      const SizedBox(height: 16),
+                      Semantics(
+                        button: true,
+                        child: Material(
+                          color: const Color(0xFFFEFD05),
+                          shape: RoundedRectangleBorder(
+                            side: const BorderSide(color: Color(0xFFE2DEDE)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: InkWell(
+                            onTap: _openMatchAlert,
+                            borderRadius: BorderRadius.circular(10),
+                            child: const SizedBox(
+                              width: 120,
+                              height: 28,
+                              child: Center(
+                                child: Text(
+                                  'Possible match',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -375,7 +375,7 @@ void main() {
     final database = FakeFirestore(
       documents: {
         'lostReports/report': lostReportData(
-          imageUrl: 'https://example.com/report.jpg',
+          photoPath: 'https://example.com/report.jpg',
         ),
       },
     );

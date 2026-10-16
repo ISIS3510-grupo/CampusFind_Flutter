@@ -11,7 +11,7 @@ class FoundItem {
     required this.locationName,
     this.latitude,
     this.longitude,
-    this.imageUrl,
+    this.photoPath,
     required this.semesterId,
     required this.donationEligible,
     required this.donationStatus,
@@ -29,7 +29,7 @@ class FoundItem {
       locationName: data['locationName'] as String,
       latitude: (data['latitude'] as num?)?.toDouble(),
       longitude: (data['longitude'] as num?)?.toDouble(),
-      imageUrl: data['imageUrl'] as String?,
+      photoPath: data['photoPath'] as String?,
       semesterId: data['semesterId'] as String,
       donationEligible: data['donationEligible'] as bool,
       donationStatus: data['donationStatus'] as String,
@@ -47,7 +47,8 @@ class FoundItem {
   final String locationName;
   final double? latitude;
   final double? longitude;
-  final String? imageUrl;
+  // Firebase Storage path of the photo, e.g. "lostReports/{id}.jpg".
+  final String? photoPath;
   final String semesterId;
   final bool donationEligible;
   final String donationStatus;

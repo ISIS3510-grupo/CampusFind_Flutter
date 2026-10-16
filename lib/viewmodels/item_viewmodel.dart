@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
  
 import '../DAOs/item_dao.dart';
+import '../features/analytics/services/report_registration_performance_tracker.dart';
 import '../models/campus_locations.dart';
 import '../models/item_model.dart';
 import '../services/location_service.dart';
@@ -14,13 +17,18 @@ class ItemViewModel extends ChangeNotifier {
     ItemDao itemDao = const ItemDao(),
     LocationService? locationService,
     FirebaseAuth? firebaseAuth,
+    ReportRegistrationPerformanceTracker tracker =
+        const ReportRegistrationPerformanceTracker(),
   }) : _itemDao = itemDao,
        _locationService = locationService ?? LocationService(),
-       _firebaseAuth = firebaseAuth;
+       _firebaseAuth = firebaseAuth,
+       _tracker = tracker;
  
   final ItemDao _itemDao;
   final LocationService _locationService;
   final FirebaseAuth? _firebaseAuth;
+  // Emilio's BQ: measures how long registering a report takes.
+  final ReportRegistrationPerformanceTracker _tracker;
  
   bool isLoading = false;
   bool isLoadingLocation = false;
@@ -92,23 +100,35 @@ class ItemViewModel extends ChangeNotifier {
       location: GeoPoint(building.latitude, building.longitude),
     );
  
-    _itemDao.insertItem(
-      item,
-      reportType: reportType,
-      userUid: userUid,
-      locationName: building.name,
-      onSuccess: () {
-        isLoading = false;
-        notifyListeners();
-        onDone(true);
-      },
-      onError: (message) {
-        isLoading = false;
-        errorMessage = message;
-        notifyListeners();
-        onDone(false);
-      },
-    );
+    // The DAO answers with callbacks; the Completer turns them into the
+    // Future the tracker measures, so the time covers the whole save.
+    _tracker
+        .measure<void>(
+          reportType: reportType,
+          operation: () {
+            final saved = Completer<void>();
+            _itemDao.insertItem(
+              item,
+              reportType: reportType,
+              userUid: userUid,
+              locationName: building.name,
+              onSuccess: saved.complete,
+              onError: saved.completeError,
+            );
+            return saved.future;
+          },
+        )
+        .then((_) {
+          isLoading = false;
+          notifyListeners();
+          onDone(true);
+        })
+        .catchError((Object error) {
+          isLoading = false;
+          errorMessage = error.toString();
+          notifyListeners();
+          onDone(false);
+        });
   }
 }
  

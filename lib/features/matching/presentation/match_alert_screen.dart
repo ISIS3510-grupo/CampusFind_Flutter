@@ -1,3 +1,4 @@
+import 'package:campusfind_flutter/core/widgets/storage_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/models/lost_report.dart';
@@ -40,7 +41,6 @@ class MatchAlertScreen extends StatelessWidget {
     final subtitle = location.isEmpty
         ? 'Found · $age'
         : 'Found in $location · $age';
-    final imageUrl = foundItem.imageUrl?.trim();
     const placeholder = Center(
       child: Icon(Icons.image, size: 26, color: Color(0xFF999798)),
     );
@@ -123,17 +123,10 @@ class MatchAlertScreen extends StatelessWidget {
                               width: double.infinity,
                               height: 180,
                               color: const Color(0xFFE2DEDE),
-                              child: imageUrl == null || imageUrl.isEmpty
-                                  ? placeholder
-                                  : Image.network(
-                                      imageUrl,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (
-                                        context,
-                                        error,
-                                        stackTrace,
-                                      ) => placeholder,
-                                    ),
+                              child: StorageImage(
+                                path: foundItem.photoPath,
+                                placeholder: placeholder,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 20),

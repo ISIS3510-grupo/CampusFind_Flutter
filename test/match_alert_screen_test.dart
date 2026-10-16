@@ -50,11 +50,11 @@ void main() {
     });
   }
 
-  for (final imageUrl in <String?>[null, '', '   ']) {
-    testWidgets('missing image "$imageUrl" uses the neutral placeholder', (
+  for (final photoPath in <String?>[null, '', '   ']) {
+    testWidgets('missing image "$photoPath" uses the neutral placeholder', (
       tester,
     ) async {
-      await _pumpAlert(tester, foundItem: _foundItem(imageUrl: imageUrl));
+      await _pumpAlert(tester, foundItem: _foundItem(photoPath: photoPath));
       expect(find.byIcon(Icons.image), findsOneWidget);
       expect(find.byType(Image), findsNothing);
       expect(tester.takeException(), isNull);
@@ -64,7 +64,7 @@ void main() {
   testWidgets('a malformed image URL displays the fallback without crashing', (
     tester,
   ) async {
-    await _pumpAlert(tester, foundItem: _foundItem(imageUrl: 'http://['));
+    await _pumpAlert(tester, foundItem: _foundItem(photoPath: 'http://['));
     expect(find.byIcon(Icons.image), findsOneWidget);
     expect(find.text('Black Calculator'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -75,7 +75,7 @@ void main() {
   ) async {
     await _pumpAlert(
       tester,
-      foundItem: _foundItem(imageUrl: 'https://example.com/found.jpg'),
+      foundItem: _foundItem(photoPath: 'https://example.com/found.jpg'),
     );
     final image = tester.widget<Image>(find.byType(Image));
     expect((image.image as NetworkImage).url, 'https://example.com/found.jpg');
@@ -215,7 +215,7 @@ FoundItem _foundItem({
   String title = 'Black Calculator',
   String locationName = 'Mario Laserna',
   DateTime? createdAt,
-  String? imageUrl,
+  String? photoPath,
 }) => FoundItem(
   id: 'found-item',
   reporterUid: 'student-2',
@@ -224,7 +224,7 @@ FoundItem _foundItem({
   publicDescription: 'Black Casio scientific calculator found',
   status: 'available',
   locationName: locationName,
-  imageUrl: imageUrl,
+  photoPath: photoPath,
   semesterId: '2026-2',
   donationEligible: false,
   donationStatus: 'not_eligible',
