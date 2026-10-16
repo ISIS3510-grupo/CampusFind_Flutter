@@ -92,7 +92,7 @@ void main() {
           ).getAvailableItems()).single;
           expect(item.reporterUid, 'student-1');
           expect(item.publicDescription, 'Black calculator');
-          expect(item.imageUrl, isNull);
+          expect(item.photoPath, isNull);
         } else {
           final report = await LostReportRepository(firestore: database)
               .getActiveReport('student-1');

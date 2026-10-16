@@ -187,7 +187,7 @@ Map<String, dynamic> lostReportData({
   String locationName = 'Mario Laserna',
   String status = 'reported',
   DateTime? reportedAt,
-  String? imageUrl,
+  String? photoPath,
 }) => {
   'ownerUid': ownerUid,
   'category': 'electronics',
@@ -198,7 +198,7 @@ Map<String, dynamic> lostReportData({
   'longitude': -74.06482,
   'status': status,
   'reportedAt': Timestamp.fromDate(reportedAt ?? DateTime.now()),
-  'imageUrl': imageUrl,
+  'photoPath': photoPath,
 };
 
 Map<String, dynamic> foundItemData({

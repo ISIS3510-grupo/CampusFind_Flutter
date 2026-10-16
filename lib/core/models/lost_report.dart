@@ -11,7 +11,7 @@ class LostReport {
     required this.locationName,
     this.latitude,
     this.longitude,
-    this.imageUrl,
+    this.photoPath,
     required this.reportedAt,
     this.statusChangedAt,
     this.foundAt,
@@ -31,7 +31,7 @@ class LostReport {
       locationName: data['locationName'] as String,
       latitude: (data['latitude'] as num?)?.toDouble(),
       longitude: (data['longitude'] as num?)?.toDouble(),
-      imageUrl: data['imageUrl'] as String?,
+      photoPath: data['photoPath'] as String?,
       reportedAt: (data['reportedAt'] as Timestamp).toDate(),
       statusChangedAt: (data['statusChangedAt'] as Timestamp?)?.toDate(),
       foundAt: (data['foundAt'] as Timestamp?)?.toDate(),
@@ -51,7 +51,8 @@ class LostReport {
   final String locationName;
   final double? latitude;
   final double? longitude;
-  final String? imageUrl;
+  // Firebase Storage path of the photo, e.g. "lostReports/{id}.jpg".
+  final String? photoPath;
   final DateTime reportedAt;
   final DateTime? statusChangedAt;
   final DateTime? foundAt;
