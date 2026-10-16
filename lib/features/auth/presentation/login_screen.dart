@@ -67,6 +67,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _handleMicrosoftAccess() async {
+    if (_viewModel.isBusy || _showingSignInDialog) return;
+    final authenticated = await _viewModel.signInStudentWithMicrosoft();
+    if (!mounted) return;
+    if (authenticated) {
+      _openHome();
+    } else if (_viewModel.errorMessage != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(_viewModel.errorMessage!)));
+    }
+  }
+
   Future<void> _handleStaffAccess() async {
     if (_viewModel.isBusy || _showingSignInDialog) return;
     _viewModel.clearError();
@@ -252,6 +264,31 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: const Text('Enter with Uniandes'),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    // Single sign-on with the student's Uniandes Microsoft account.
+                    SizedBox(
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: _viewModel.isBusy || _showingSignInDialog
+                            ? null
+                            : _handleMicrosoftAccess,
+                        icon: const _MicrosoftLogo(),
+                        label: const Text('Sign in with Microsoft'),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          side: const BorderSide(color: Color(0xFF8C8C8C)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          textStyle: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     // Staff uses the same email/password dialog with admin validation.
                     SizedBox(
@@ -426,6 +463,40 @@ class _SignInDialogState extends State<_SignInDialog> {
                     ),
                   )
                 : const Text('Sign in'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Microsoft's four-square mark, drawn with widgets so no image asset is needed.
+class _MicrosoftLogo extends StatelessWidget {
+  const _MicrosoftLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget square(Color color) =>
+        SizedBox(width: 9, height: 9, child: ColoredBox(color: color));
+    return SizedBox(
+      width: 20,
+      height: 20,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              square(const Color(0xFFF25022)),
+              square(const Color(0xFF7FBA00)),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              square(const Color(0xFF00A4EF)),
+              square(const Color(0xFFFFB900)),
+            ],
           ),
         ],
       ),

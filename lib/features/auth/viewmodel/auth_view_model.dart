@@ -79,6 +79,25 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> signInStudentWithMicrosoft() async {
+    if (_isBusy || _disposed) return false;
+    _beginAuthentication();
+    try {
+      final error = await authService.signInStudentWithMicrosoft();
+      if (_disposed) return false;
+      _errorMessage = error;
+      _isAuthenticated = error == null;
+      return _isAuthenticated;
+    } catch (_) {
+      if (!_disposed) {
+        _errorMessage = 'Unable to sign in with Microsoft. Please try again.';
+      }
+      return false;
+    } finally {
+      _finishAuthentication();
+    }
+  }
+
   void _beginAuthentication() {
     _isBusy = true;
     _isAuthenticated = false;

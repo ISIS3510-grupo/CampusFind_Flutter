@@ -58,6 +58,82 @@ class AuthService {
     return error;
   }
 
+  // Microsoft Entra tenant of Universidad de los Andes. Pinning it makes
+  // Microsoft only show Uniandes accounts in the sign-in page.
+  static const uniandesTenantId = 'fabd047c-ff48-492a-8bbb-8f98b9fb9cca';
+
+  // Single sign-on with the student's Uniandes Microsoft account. The first
+  // time a student enters this way, their student profile is created.
+  Future<String?> signInStudentWithMicrosoft() async {
+    var authenticated = false;
+    String? error;
+    try {
+      final provider = MicrosoftAuthProvider()
+        ..setCustomParameters({
+          'tenant': uniandesTenantId,
+          'prompt': 'select_account',
+        });
+      final credential = await _auth.signInWithProvider(provider);
+      final user = credential.user;
+      if (user == null) return 'Unable to sign in with Microsoft.';
+      authenticated = true;
+
+      if (!_isUniandesEmail(user.email)) {
+        error = 'Use your @uniandes.edu.co Microsoft account.';
+      } else {
+        await _ensureStudentProfile(user);
+        error = await verifyStudentRole();
+      }
+    } on FirebaseAuthException catch (exception) {
+      error = _microsoftSignInError(exception);
+    } on FirebaseException {
+      error = 'Unable to verify your student account. Please try again.';
+    } catch (_) {
+      error = 'Unable to sign in with Microsoft. Please try again.';
+    }
+
+    if (authenticated && error != null) {
+      try {
+        await signOut();
+      } catch (_) {}
+    }
+    return error;
+  }
+
+  Future<void> _ensureStudentProfile(User user) async {
+    final reference = _firestore.collection('users').doc(user.uid);
+    final profile = await reference.get(
+      const GetOptions(source: Source.server),
+    );
+    if (profile.exists) return;
+    final email = user.email!;
+    await reference.set({
+      'email': email,
+      'displayName': user.displayName ?? email.split('@').first,
+      'role': 'student',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  bool _isUniandesEmail(String? email) {
+    final parts = (email ?? '').toLowerCase().split('@');
+    return parts.length == 2 &&
+        parts.first.isNotEmpty &&
+        parts.last == 'uniandes.edu.co';
+  }
+
+  String _microsoftSignInError(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'web-context-canceled':
+      case 'canceled':
+        return 'Microsoft sign in was cancelled.';
+      case 'account-exists-with-different-credential':
+        return 'This email already uses password sign in. Use "Enter with Uniandes".';
+      default:
+        return _signInError(error);
+    }
+  }
+
   Future<void> signOut() async {
     await _auth.signOut();
   }
