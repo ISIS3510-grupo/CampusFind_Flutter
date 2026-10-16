@@ -1,4 +1,5 @@
 import 'package:campusfind_flutter/models/notification_model.dart';
+import 'package:campusfind_flutter/services/match_analytics_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -9,9 +10,13 @@ class NotificationsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final analyticsService = MatchAnalyticsService();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Notificaciones')),
+      appBar: AppBar(
+        title: const Text('Notifications'),
+        
+      ),
       body: StreamBuilder<QuerySnapshot>(
         // Escuchamos en tiempo real la colección 'notifications' creada por el backend
         stream: FirebaseFirestore.instance
@@ -53,19 +58,26 @@ class NotificationsScreen extends StatelessWidget {
                   subtitle: Text('Canal: ${notification.channel}'),
                   trailing: notification.sentAt != null
                       ? Text(
-                          '${notification.sentAt!.hour}:${notification.sentAt!.minute}',
+                          '${notification.sentAt!.hour}:${notification.sentAt!.minute.toString().padLeft(2, '0')}',
                           style: const TextStyle(
                             color: Colors.grey,
                             fontSize: 12,
                           ),
                         )
                       : null,
-                ),
+                  onTap: () {
+                    analyticsService.trackMatchReviewed(
+                      notification.id,
+                      notification.viewedAt != null,
+                      );
+                      }
+                    ),
+                );
+            },
               );
             },
-          );
-        },
-      ),
+          ),
     );
+    
+        }
   }
-}

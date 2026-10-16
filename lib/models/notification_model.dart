@@ -4,6 +4,7 @@ class NotificationModel {
   final String matchId;
   final String recipientUid;
   final DateTime? sentAt;
+  final DateTime? viewedAt;
 
   NotificationModel({
     required this.id,
@@ -11,6 +12,7 @@ class NotificationModel {
     required this.matchId,
     required this.recipientUid,
     this.sentAt,
+    this.viewedAt,
   });
 
   factory NotificationModel.fromFirestore(Map<String, dynamic> data, String id) {
@@ -20,6 +22,7 @@ class NotificationModel {
       matchId: data['matchId'] ?? '',
       recipientUid: data['recipientUid'] ?? '',
       sentAt: data['sentAt']?.toDate(),
+      viewedAt: data['viewedAt']?.toDate(),
     );
   }
 }
