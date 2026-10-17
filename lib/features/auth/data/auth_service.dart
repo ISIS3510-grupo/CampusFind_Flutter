@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import 'microsoft_sign_in.dart';
 
@@ -88,10 +89,16 @@ class AuthService {
     } on MicrosoftSignInException catch (exception) {
       error = exception.message;
     } on FirebaseAuthException catch (exception) {
+      debugPrint('Microsoft sign in, Firebase Auth failed: ${exception.code}');
       error = _signInError(exception);
-    } on FirebaseException {
+    } on FirebaseException catch (exception) {
+      debugPrint(
+        'Microsoft sign in, student profile failed: '
+        '${exception.plugin}/${exception.code}',
+      );
       error = 'Unable to verify your student account. Please try again.';
-    } catch (_) {
+    } catch (exception) {
+      debugPrint('Microsoft sign in failed: $exception');
       error = 'Unable to sign in with Microsoft. Please try again.';
     }
 

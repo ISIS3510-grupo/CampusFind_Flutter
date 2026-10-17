@@ -1,4 +1,5 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:msal_auth/msal_auth.dart';
 
 // Signs the student in with their Uniandes Microsoft account and returns a
@@ -56,12 +57,13 @@ class MsalMicrosoftSignIn implements MicrosoftSignIn {
       idToken = result.idToken;
     } on MsalUserCancelException {
       return null;
-    } on MsalException {
-      throw const MicrosoftSignInException(
-        'Unable to sign in with Microsoft. Please try again.',
-      );
+    } on MsalException catch (error) {
+      // The student sees a short message; the MSAL reason stays in the log.
+      debugPrint('Microsoft sign in failed: $error');
+      throw MicrosoftSignInException(_msalErrorMessage(error));
     }
     if (idToken == null || idToken.isEmpty) {
+      debugPrint('Microsoft sign in failed: MSAL returned no ID token.');
       throw const MicrosoftSignInException('Unable to sign in with Microsoft.');
     }
 
@@ -74,17 +76,33 @@ class MsalMicrosoftSignIn implements MicrosoftSignIn {
           .call({'idToken': idToken});
       final token = (result.data as Map?)?['customToken'];
       if (token is! String || token.isEmpty) {
+        debugPrint('exchangeMicrosoftToken returned no custom token.');
         throw const MicrosoftSignInException(
           'Unable to sign in with Microsoft.',
         );
       }
       return token;
     } on FirebaseFunctionsException catch (error) {
+      debugPrint(
+        'exchangeMicrosoftToken failed: ${error.code} ${error.message}',
+      );
       throw MicrosoftSignInException(
         error.code == 'unauthenticated'
             ? 'Use your @uniandes.edu.co Microsoft account.'
             : 'Unable to reach CampusFind. Check your connection.',
       );
     }
+  }
+
+  // Entra answers AADSTS65001 / 90094 / 90095 when the Uniandes tenant has
+  // not approved CampusFind yet; only an administrator can fix that.
+  static String _msalErrorMessage(MsalException error) {
+    final reason = error.message;
+    if (reason.contains('AADSTS65001') ||
+        reason.contains('AADSTS90094') ||
+        reason.contains('AADSTS90095')) {
+      return 'Uniandes has not approved CampusFind for Microsoft sign in yet.';
+    }
+    return 'Unable to sign in with Microsoft. Please try again.';
   }
 }
