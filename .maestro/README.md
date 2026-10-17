@@ -17,6 +17,9 @@ flutter build apk --debug && adb install -r build/app/outputs/flutter-apk/app-de
 maestro test -e EMAIL=<student email> -e PASSWORD=<password> -e TITLE="Maestro $(date +%H%M%S)" .maestro
 ```
 
+Or, from the repo root: `make e2e` (reads `EMAIL`/`PASSWORD` from the environment
+or from the file in `MAESTRO_ENV`).
+
 - Use a test student account. Never write the password in these files.
 - Maestro needs Java 17 (`JAVA_HOME`).
 - On the emulator, turn off stylus handwriting or Gboard catches the typed text:
