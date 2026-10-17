@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../analytics/data/firestore_feature_usage_tracker.dart';
+import '../../analytics/domain/app_feature.dart';
+import '../../analytics/domain/feature_usage_tracker.dart';
 import '../../analytics/presentation/analytics_dashboard_screen.dart';
 import '../../analytics/presentation/feature_usage_panel.dart';
 import '../../home/presentation/home_screen.dart';
@@ -7,6 +10,7 @@ import '../data/auth_service.dart';
 import '../data/biometric_service.dart';
 import '../viewmodel/auth_view_model.dart';
 import '../../../utils/email_validator.dart';
+
 import 'package:campusfind_flutter/views/match_review_card.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,6 +21,7 @@ class LoginScreen extends StatefulWidget {
     this.homeBuilder,
     this.staffDashboardBuilder,
     this.viewModel,
+    this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
   });
 
   final AuthService authService;
@@ -25,6 +30,7 @@ class LoginScreen extends StatefulWidget {
   final WidgetBuilder? staffDashboardBuilder;
   // Injected ViewModels remain owned by the caller.
   final AuthViewModel? viewModel;
+  final FeatureUsageTracker featureUsageTracker;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -60,6 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_viewModel.needsPasswordSignIn) {
       await _showSignInDialog();
     } else if (_viewModel.isAuthenticated) {
+      widget.featureUsageTracker.track(AppFeature.biometricLogin);
       _openHome();
     } else if (_viewModel.errorMessage != null) {
       ScaffoldMessenger.of(context)
@@ -87,6 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (isStaff) {
           _openStaffDashboard();
         } else {
+          widget.featureUsageTracker.track(AppFeature.passwordLogin);
           _openHome();
         }
       }
@@ -115,8 +123,10 @@ class _LoginScreenState extends State<LoginScreen> {
             widget.staffDashboardBuilder ??
             (context) => const AnalyticsDashboardScreen(
               // Jhostin's Type 3 BQ, next to the bottleneck and timing BQs.
-              additionalPanels: [FeatureUsagePanel(),
-              MatchReviewCard(),],//BQ Sofia
+              additionalPanels: [
+                FeatureUsagePanel(),
+                MatchReviewCard(),
+              ], //BQ Sofia
             ),
       ),
     );
