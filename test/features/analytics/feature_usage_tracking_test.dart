@@ -1,9 +1,11 @@
 import 'package:campusfind_flutter/features/analytics/domain/app_feature.dart';
+import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
 import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/auth_fakes.dart';
 import '../reports/fake_lost_report_repository.dart';
 import 'fake_feature_usage_tracker.dart';
 
@@ -77,5 +79,53 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tracker.tracked, [AppFeature.submitLostReport]);
+  });
+
+  testWidgets('a biometric login is recorded', (tester) async {
+    final tracker = FakeFeatureUsageTracker();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LoginScreen(
+          authService: FakeAuthService(savedSession: true),
+          biometricService: FakeBiometricService(),
+          homeBuilder: (_) => const Text('Home'),
+          featureUsageTracker: tracker,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Enter with Uniandes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Home'), findsOneWidget);
+    expect(tracker.tracked, [AppFeature.biometricLogin]);
+  });
+
+  testWidgets('a student password login is recorded', (tester) async {
+    final tracker = FakeFeatureUsageTracker();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LoginScreen(
+          authService: FakeAuthService(),
+          biometricService: FakeBiometricService(),
+          homeBuilder: (_) => const Text('Home'),
+          featureUsageTracker: tracker,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Enter with Uniandes'));
+    await tester.pumpAndSettle();
+    final fields = find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(fields.at(0), 'student@uniandes.edu.co');
+    await tester.enterText(fields.at(1), 'Password123!');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Home'), findsOneWidget);
+    expect(tracker.tracked, [AppFeature.passwordLogin]);
   });
 }
