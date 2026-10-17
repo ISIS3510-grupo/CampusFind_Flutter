@@ -9,6 +9,14 @@ abstract class MicrosoftSignIn {
   Future<String?> firebaseCustomToken();
 }
 
+// Debug builds (the test APKs) also show the technical reason, so a failure
+// on a phone without adb can be reported. Release builds keep the message.
+String withDebugReason(String message, Object reason) {
+  if (!kDebugMode) return message;
+  final text = '$reason';
+  return '$message\n(${text.length > 160 ? text.substring(0, 160) : text})';
+}
+
 class MicrosoftSignInException implements Exception {
   const MicrosoftSignInException(this.message);
   final String message;
@@ -58,9 +66,14 @@ class MsalMicrosoftSignIn implements MicrosoftSignIn {
     } on MsalUserCancelException {
       return null;
     } on MsalException catch (error) {
-      // The student sees a short message; the MSAL reason stays in the log.
+      // The full MSAL reason goes to the log; the student sees a short message.
       debugPrint('Microsoft sign in failed: $error');
-      throw MicrosoftSignInException(_msalErrorMessage(error));
+      throw MicrosoftSignInException(
+        withDebugReason(
+          _msalErrorMessage(error),
+          '${error.runtimeType}: ${error.message}',
+        ),
+      );
     }
     if (idToken == null || idToken.isEmpty) {
       debugPrint('Microsoft sign in failed: MSAL returned no ID token.');
@@ -87,9 +100,12 @@ class MsalMicrosoftSignIn implements MicrosoftSignIn {
         'exchangeMicrosoftToken failed: ${error.code} ${error.message}',
       );
       throw MicrosoftSignInException(
-        error.code == 'unauthenticated'
-            ? 'Use your @uniandes.edu.co Microsoft account.'
-            : 'Unable to reach CampusFind. Check your connection.',
+        withDebugReason(
+          error.code == 'unauthenticated'
+              ? 'Use your @uniandes.edu.co Microsoft account.'
+              : 'Unable to reach CampusFind. Check your connection.',
+          error.code,
+        ),
       );
     }
   }

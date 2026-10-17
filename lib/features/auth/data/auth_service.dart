@@ -99,7 +99,10 @@ class AuthService {
       error = 'Unable to verify your student account. Please try again.';
     } catch (exception) {
       debugPrint('Microsoft sign in failed: $exception');
-      error = 'Unable to sign in with Microsoft. Please try again.';
+      error = withDebugReason(
+        'Unable to sign in with Microsoft. Please try again.',
+        exception,
+      );
     }
 
     if (authenticated && error != null) {
