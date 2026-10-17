@@ -1,11 +1,30 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <!-- Microsoft sign-in (MSAL) talks to the broker and the browser. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" /> //ubicación precisa: con hardware
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" /> // ubicación aproximada : triangulación wifi
     <application
         android:label="campusfind_flutter"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Receives the answer of Microsoft sign-in (MSAL) when it uses the
+             browser or the Authenticator app. The path is the signature hash
+             of the key that signs the APK, set in build.gradle.kts. -->
+        <activity
+            android:name="com.microsoft.identity.client.BrowserTabActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="com.campusfind.flutter"
+                    android:path="/${msalSignatureHash}"
+                    android:scheme="msauth" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".MainActivity"
             android:exported="true"

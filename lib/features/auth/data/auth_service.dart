@@ -1,11 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'microsoft_sign_in.dart';
+
 class AuthService {
-  const AuthService({this.firebaseAuth, this.firestore});
+  const AuthService({
+    this.firebaseAuth,
+    this.firestore,
+    this.microsoftSignIn = const MsalMicrosoftSignIn(),
+  });
 
   final FirebaseAuth? firebaseAuth;
   final FirebaseFirestore? firestore;
+  final MicrosoftSignIn microsoftSignIn;
 
   FirebaseAuth get _auth => firebaseAuth ?? FirebaseAuth.instance;
   FirebaseFirestore get _firestore => firestore ?? FirebaseFirestore.instance;
@@ -58,22 +65,16 @@ class AuthService {
     return error;
   }
 
-  // Microsoft Entra tenant of Universidad de los Andes. Pinning it makes
-  // Microsoft only show Uniandes accounts in the sign-in page.
-  static const uniandesTenantId = 'fabd047c-ff48-492a-8bbb-8f98b9fb9cca';
-
-  // Single sign-on with the student's Uniandes Microsoft account. The first
-  // time a student enters this way, their student profile is created.
+  // Single sign-on with the student's Uniandes Microsoft account (MSAL). The
+  // first time a student enters this way, their student profile is created.
   Future<String?> signInStudentWithMicrosoft() async {
     var authenticated = false;
     String? error;
     try {
-      final provider = MicrosoftAuthProvider()
-        ..setCustomParameters({
-          'tenant': uniandesTenantId,
-          'prompt': 'select_account',
-        });
-      final credential = await _auth.signInWithProvider(provider);
+      final customToken = await microsoftSignIn.firebaseCustomToken();
+      if (customToken == null) return 'Microsoft sign in was cancelled.';
+
+      final credential = await _auth.signInWithCustomToken(customToken);
       final user = credential.user;
       if (user == null) return 'Unable to sign in with Microsoft.';
       authenticated = true;
@@ -84,8 +85,10 @@ class AuthService {
         await _ensureStudentProfile(user);
         error = await verifyStudentRole();
       }
+    } on MicrosoftSignInException catch (exception) {
+      error = exception.message;
     } on FirebaseAuthException catch (exception) {
-      error = _microsoftSignInError(exception);
+      error = _signInError(exception);
     } on FirebaseException {
       error = 'Unable to verify your student account. Please try again.';
     } catch (_) {
@@ -120,18 +123,6 @@ class AuthService {
     return parts.length == 2 &&
         parts.first.isNotEmpty &&
         parts.last == 'uniandes.edu.co';
-  }
-
-  String _microsoftSignInError(FirebaseAuthException error) {
-    switch (error.code) {
-      case 'web-context-canceled':
-      case 'canceled':
-        return 'Microsoft sign in was cancelled.';
-      case 'account-exists-with-different-credential':
-        return 'This email already uses password sign in. Use "Enter with Uniandes".';
-      default:
-        return _signInError(error);
-    }
   }
 
   Future<void> signOut() async {

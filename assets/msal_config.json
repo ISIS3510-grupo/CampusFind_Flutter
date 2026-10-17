@@ -1,0 +1,25 @@
+{
+  "account_mode": "SINGLE",
+  "authorities": [
+    {
+      "type": "AAD",
+      "audience": {
+        "type": "AzureADMyOrg",
+        "tenant_id": "fabd047c-ff48-492a-8bbb-8f98b9fb9cca"
+      }
+    }
+  ],
+  "broker_redirect_uri_registered": true,
+  "authorization_user_agent": "DEFAULT",
+  "multiple_clouds_supported": false,
+  "shared_device_mode_supported": false,
+  "http": {
+    "connect_timeout": 10000,
+    "read_timeout": 30000
+  },
+  "logging": {
+    "pii_enabled": false,
+    "log_level": "WARNING",
+    "logcat_enabled": false
+  }
+}

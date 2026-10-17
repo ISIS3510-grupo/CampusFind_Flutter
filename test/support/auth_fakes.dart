@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
 import 'package:campusfind_flutter/features/auth/data/biometric_service.dart';
+import 'package:campusfind_flutter/features/auth/data/microsoft_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -154,6 +155,17 @@ class FakeFirebaseAuthClient extends Fake implements FirebaseAuth {
     return _FakeUserCredential();
   }
 
+  String? lastCustomToken;
+
+  @override
+  Future<UserCredential> signInWithCustomToken(String token) async {
+    signInCalls++;
+    lastCustomToken = token;
+    if (signInError != null) throw signInError!;
+    currentUser = signInUser;
+    return _FakeUserCredential(signInUser);
+  }
+
   @override
   Future<void> signOut() async {
     signOutCalls++;
@@ -167,7 +179,11 @@ class FakeFirebaseUser extends Fake implements User {
     this.uid = 'staff-test',
     this.email = 'staff@uniandes.edu.co',
     this.emailVerified = true,
+    this.displayName,
   });
+
+  @override
+  final String? displayName;
 
   @override
   final String uid;
@@ -177,4 +193,25 @@ class FakeFirebaseUser extends Fake implements User {
   final bool emailVerified;
 }
 
-class _FakeUserCredential extends Fake implements UserCredential {}
+class _FakeUserCredential extends Fake implements UserCredential {
+  _FakeUserCredential([this.user]);
+
+  @override
+  final User? user;
+}
+
+// Microsoft sign-in double: returns a custom token, null (cancelled) or throws.
+class FakeMicrosoftSignIn implements MicrosoftSignIn {
+  FakeMicrosoftSignIn({this.customToken = 'custom-token', this.error});
+
+  final String? customToken;
+  final Object? error;
+  int calls = 0;
+
+  @override
+  Future<String?> firebaseCustomToken() async {
+    calls++;
+    if (error != null) throw error!;
+    return customToken;
+  }
+}

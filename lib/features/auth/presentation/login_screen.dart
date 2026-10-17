@@ -7,6 +7,7 @@ import '../data/auth_service.dart';
 import '../data/biometric_service.dart';
 import '../viewmodel/auth_view_model.dart';
 import '../../../utils/email_validator.dart';
+
 import 'package:campusfind_flutter/views/match_review_card.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -127,8 +128,10 @@ class _LoginScreenState extends State<LoginScreen> {
             widget.staffDashboardBuilder ??
             (context) => const AnalyticsDashboardScreen(
               // Jhostin's Type 3 BQ, next to the bottleneck and timing BQs.
-              additionalPanels: [FeatureUsagePanel(),
-              MatchReviewCard(),],//BQ Sofia
+              additionalPanels: [
+                FeatureUsagePanel(),
+                MatchReviewCard(),
+              ], //BQ Sofia
             ),
       ),
     );
