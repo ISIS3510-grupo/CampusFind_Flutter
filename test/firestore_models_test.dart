@@ -26,7 +26,7 @@ void main() {
       expect(report.longitude, isA<double>());
       expect(report.reportedAt.toUtc(), _reportedAt);
       expect(report.statusChangedAt?.toUtc(), _reportedAt);
-      expect(report.imageUrl, isNull);
+      expect(report.photoPath, isNull);
       expect(report.foundAt, isNull);
       expect(report.readyForPickupAt, isNull);
       expect(report.claimedAt, isNull);
@@ -37,7 +37,7 @@ void main() {
       test('accepts ${explicitNull ? 'null' : 'absent'} optional fields', () {
         final data = _lostData();
         for (final field in [
-          'imageUrl',
+          'photoPath',
           'latitude',
           'longitude',
           'statusChangedAt',
@@ -55,7 +55,7 @@ void main() {
 
         final report = LostReport.fromFirestore('lost_test_001', data);
 
-        expect(report.imageUrl, isNull);
+        expect(report.photoPath, isNull);
         expect(report.latitude, isNull);
         expect(report.longitude, isNull);
         expect(report.statusChangedAt, isNull);
@@ -75,7 +75,7 @@ void main() {
       final report = LostReport.fromFirestore('lost_test_001', {
         ..._lostData(),
         'id': 'ignored-field-id',
-        'imageUrl': 'https://example.com/lost.jpg',
+        'photoPath': 'https://example.com/lost.jpg',
         'status': 'closed',
         'statusChangedAt': Timestamp.fromDate(closedAt),
         'foundAt': Timestamp.fromDate(foundAt),
@@ -85,7 +85,7 @@ void main() {
       });
 
       expect(report.id, 'lost_test_001');
-      expect(report.imageUrl, 'https://example.com/lost.jpg');
+      expect(report.photoPath, 'https://example.com/lost.jpg');
       expect(report.status, 'closed');
       expect(report.statusChangedAt?.toUtc(), closedAt);
       expect(report.foundAt?.toUtc(), foundAt);
@@ -115,13 +115,13 @@ void main() {
       expect(item.donationEligible, isFalse);
       expect(item.donationStatus, 'not_eligible');
       expect(item.createdAt.toUtc(), _reportedAt);
-      expect(item.imageUrl, isNull);
+      expect(item.photoPath, isNull);
     });
 
     for (final explicitNull in [false, true]) {
       test('accepts ${explicitNull ? 'null' : 'absent'} optional fields', () {
         final data = _foundData();
-        for (final field in ['imageUrl', 'latitude', 'longitude']) {
+        for (final field in ['photoPath', 'latitude', 'longitude']) {
           if (explicitNull) {
             data[field] = null;
           } else {
@@ -131,7 +131,7 @@ void main() {
 
         final item = FoundItem.fromFirestore('found_test_001', data);
 
-        expect(item.imageUrl, isNull);
+        expect(item.photoPath, isNull);
         expect(item.latitude, isNull);
         expect(item.longitude, isNull);
         expect(item.createdAt.toUtc(), _reportedAt);
@@ -142,11 +142,11 @@ void main() {
       final item = FoundItem.fromFirestore('found_test_001', {
         ..._foundData(),
         'id': 'ignored-field-id',
-        'imageUrl': 'https://example.com/found.jpg',
+        'photoPath': 'https://example.com/found.jpg',
       });
 
       expect(item.id, 'found_test_001');
-      expect(item.imageUrl, 'https://example.com/found.jpg');
+      expect(item.photoPath, 'https://example.com/found.jpg');
     });
   });
 

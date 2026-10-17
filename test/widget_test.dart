@@ -448,7 +448,8 @@ Widget _foundItemForm(BuildContext context) => const Text('Found item form');
 // The found item form asks for GPS to suggest a building; without a device it
 // answers at once so the form keeps the default building order.
 class _NoGpsLocation extends LocationService {
+  // No GPS in widget tests.
   @override
-  Future<Position> getCurrentLocation() =>
-      Future.error('No GPS in widget tests.');
+  void getCurrentLocation(void Function(Position? position) onResult) =>
+      onResult(null);
 }

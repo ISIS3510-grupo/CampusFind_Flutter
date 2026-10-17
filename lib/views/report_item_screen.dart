@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
+ 
 import '../viewmodels/item_viewmodel.dart';
 import '../models/campus_locations.dart';
-
+ 
 class ReportItemScreen extends StatefulWidget {
   const ReportItemScreen({super.key, required this.reportType})
     : assert(reportType == 'found' || reportType == 'lost');
-
+ 
   final String reportType;
-
+ 
   @override
   State<ReportItemScreen> createState() => _ReportItemScreenState();
 }
-
+ 
 class _ReportItemScreenState extends State<ReportItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _categoryController = TextEditingController();
-
+ 
   static const Color uniandesYellow = Color(0xFFFFF200);
-
+ 
   @override
   void initState() {
     super.initState();
@@ -29,7 +29,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
       context.read<ItemViewModel>().loadPrioritizedLocations();
     });
   }
-
+ 
   @override
   void dispose() {
     _titleController.dispose();
@@ -37,17 +37,18 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     _categoryController.dispose();
     super.dispose();
   }
-
-  void _submitForm(ItemViewModel viewModel) async {
-    if (_formKey.currentState!.validate()) {
-      bool success = await viewModel.reportItem(
-        reportType: widget.reportType,
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        category: _categoryController.text.trim(),
-      );
-
-      if (mounted) {
+ 
+  // Sin async/await: el ViewModel avisa el resultado con el callback onDone.
+  void _submitForm(ItemViewModel viewModel) {
+    if (!_formKey.currentState!.validate()) return;
+ 
+    viewModel.reportItem(
+      reportType: widget.reportType,
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      category: _categoryController.text.trim(),
+      onDone: (bool success) {
+        if (!mounted) return;
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -67,14 +68,14 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
             ),
           );
         }
-      }
-    }
+      },
+    );
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<ItemViewModel>();
-
+ 
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -113,8 +114,6 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                     : null,
               ),
               const SizedBox(height: 20),
-
-            
               const Text(
                 'Ubicación en el Campus',
                 style: TextStyle(
@@ -124,27 +123,27 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-
               viewModel.isLoadingLocation
                   ? const LinearProgressIndicator(
                       color: Colors.black,
                       backgroundColor: uniandesYellow,
                     )
                   : DropdownButtonFormField<CampusLocation>(
-                      value: viewModel.selectedLocation,
-                      // Long building names are cut with "..." instead of
-                      // overflowing the form on small screens.
+                      // Nombres largos se cortan con "..." en vez de desbordar.
                       isExpanded: true,
+                      initialValue: viewModel.selectedLocation,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(color: Colors.black, width: 2),
                         ),
-                        prefixIcon: Icon(Icons.location_on, color: Colors.black),
+                        prefixIcon: Icon(
+                          Icons.location_on,
+                          color: Colors.black,
+                        ),
                       ),
                       items: viewModel.locations.map((loc) {
-                        final bool isClosest =
-                            loc == viewModel.locations.first;
+                        final bool isClosest = loc == viewModel.locations.first;
                         return DropdownMenuItem<CampusLocation>(
                           value: loc,
                           child: Text(
@@ -165,9 +164,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                         viewModel.selectLocation(newLocation);
                       },
                     ),
-
               const SizedBox(height: 24),
-
               viewModel.isLoading
                   ? const Center(
                       child: CircularProgressIndicator(color: Colors.black),
@@ -181,7 +178,10 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: Colors.black, width: 1.5),
+                            side: const BorderSide(
+                              color: Colors.black,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                         onPressed: () => _submitForm(viewModel),
@@ -201,3 +201,4 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     );
   }
 }
+ 
