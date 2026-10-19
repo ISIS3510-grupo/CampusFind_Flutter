@@ -207,11 +207,17 @@ class FakeMicrosoftSignIn implements MicrosoftSignIn {
   final String? customToken;
   final Object? error;
   int calls = 0;
+  int signOuts = 0;
 
   @override
   Future<String?> firebaseCustomToken() async {
     calls++;
     if (error != null) throw error!;
     return customToken;
+  }
+
+  @override
+  Future<void> signOut() async {
+    signOuts++;
   }
 }

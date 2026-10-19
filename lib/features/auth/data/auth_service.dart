@@ -137,6 +137,13 @@ class AuthService {
 
   Future<void> signOut() async {
     await _auth.signOut();
+    // Students who came in with Microsoft also leave MSAL; a failure there
+    // must not keep them signed in.
+    try {
+      await microsoftSignIn.signOut();
+    } catch (error) {
+      debugPrint('Microsoft sign out failed: $error');
+    }
   }
 
   Future<String?> signInAdmin(String email, String password) async {

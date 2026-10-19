@@ -118,4 +118,15 @@ void main() {
     );
     expect(auth.signOutCalls, 1);
   });
+
+  test('signing out also forgets the Microsoft account', () async {
+    final microsoft = FakeMicrosoftSignIn();
+    final (:service, :auth, db: _) = setUpService(microsoft: microsoft);
+
+    expect(await service.signInStudentWithMicrosoft(), isNull);
+    await service.signOut();
+
+    expect(auth.signOutCalls, 1);
+    expect(microsoft.signOuts, 1);
+  });
 }

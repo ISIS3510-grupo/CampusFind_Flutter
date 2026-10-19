@@ -7,6 +7,9 @@ import 'package:msal_auth/msal_auth.dart';
 abstract class MicrosoftSignIn {
   // Null when the student closes the Microsoft sign-in.
   Future<String?> firebaseCustomToken();
+
+  // Forgets the Microsoft account, so the next sign-in starts clean.
+  Future<void> signOut();
 }
 
 // Debug builds (the test APKs) also show the technical reason, so a failure
@@ -58,6 +61,10 @@ class MsalMicrosoftSignIn implements MicrosoftSignIn {
     final String? idToken;
     try {
       final app = await _publicClient();
+      // MSAL keeps one account per app: a previous one left behind (a Firebase
+      // sign-out alone does not clear it) fails the next interactive sign-in
+      // with "the signed in account does not match the provided account".
+      await _forget(app);
       final result = await app.acquireToken(
         scopes: const ['User.Read'],
         prompt: Prompt.selectAccount,
@@ -107,6 +114,20 @@ class MsalMicrosoftSignIn implements MicrosoftSignIn {
           error.code,
         ),
       );
+    }
+  }
+
+  @override
+  Future<void> signOut() async {
+    await _forget(await _publicClient());
+  }
+
+  // No account to forget is not an error.
+  static Future<void> _forget(SingleAccountPca app) async {
+    try {
+      await app.signOut();
+    } on MsalException catch (error) {
+      debugPrint('Microsoft sign out: ${error.runtimeType}');
     }
   }
 
