@@ -73,7 +73,12 @@ class _HomeScreenState extends State<HomeScreen> {
           matchingConfigRepository: widget.matchingConfigRepository,
           createMatchingService: widget.createMatchingService,
         );
-    _viewModel.loadHome();
+    _viewModel.loadHome().then((_) {
+      // Counted once per visit, when Home shows the student's own report.
+      if (mounted && _viewModel.activeReport != null) {
+        widget.featureUsageTracker.track(AppFeature.viewMyReport);
+      }
+    });
   }
 
   @override

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:campusfind_flutter/core/data/found_item_repository.dart';
 import 'package:campusfind_flutter/core/data/lost_report_repository.dart';
 import 'package:campusfind_flutter/core/theme/app_theme.dart';
+import 'package:campusfind_flutter/features/analytics/domain/app_feature.dart';
+import 'package:campusfind_flutter/features/analytics/domain/feature_usage_tracker.dart';
 import 'package:campusfind_flutter/features/auth/data/auth_service.dart';
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/drop_off/presentation/drop_off_instructions_screen.dart';
@@ -15,6 +17,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'features/analytics/fake_feature_usage_tracker.dart';
 import 'support/firestore_fakes.dart';
 import 'support/drop_off_fakes.dart';
 import 'support/test_fonts.dart';
@@ -173,6 +176,26 @@ void main() {
       expect(database.documentReads, isEmpty);
     },
   );
+
+  testWidgets('seeing the active report is recorded once', (tester) async {
+    final tracker = FakeFeatureUsageTracker();
+    final database = FakeFirestore(
+      documents: {'lostReports/report-1': lostReportData()},
+    );
+    await _pumpHome(tester, database, featureUsageTracker: tracker);
+    await tester.pumpAndSettle();
+
+    expect(find.text('My active report'), findsOneWidget);
+    expect(tracker.tracked, [AppFeature.viewMyReport]);
+  });
+
+  testWidgets('no active report records no view', (tester) async {
+    final tracker = FakeFeatureUsageTracker();
+    await _pumpHome(tester, FakeFirestore(), featureUsageTracker: tracker);
+    await tester.pumpAndSettle();
+
+    expect(tracker.tracked, isEmpty);
+  });
 
   testWidgets('no UID issues no Firestore reads', (tester) async {
     final database = FakeFirestore();
@@ -515,6 +538,7 @@ Future<void> _pumpHome(
   FakeFirestore database, {
   _HomeAuth? auth,
   Widget Function(BuildContext, WidgetBuilder)? dropOffBuilder,
+  FeatureUsageTracker? featureUsageTracker,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
@@ -530,7 +554,11 @@ Future<void> _pumpHome(
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.lightTheme,
-      home: HomeScreen(viewModel: viewModel, dropOffBuilder: dropOffBuilder),
+      home: HomeScreen(
+        viewModel: viewModel,
+        dropOffBuilder: dropOffBuilder,
+        featureUsageTracker: featureUsageTracker ?? FakeFeatureUsageTracker(),
+      ),
     ),
   );
 }
