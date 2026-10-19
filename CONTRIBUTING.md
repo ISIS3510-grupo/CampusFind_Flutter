@@ -91,3 +91,54 @@ Never commit API keys, tokens or passwords (Twilio, email services, Maps keys wi
 ## 8. Deadlines
 
 Deadlines are in GMT-5, but GitHub records timestamps in UTC. Commits or wiki edits after the deadline are not graded, and a wiki edit after the deadline gives the deliverable a 0.
+
+## 9. Code conventions
+
+These rules keep the code in one shape no matter who wrote it. CodeRabbit checks them on every pull request (see `.coderabbit.yaml`), and reviewers should too.
+
+### Folders
+
+Each feature lives in `lib/features/<feature>/` with the same layers:
+
+```
+lib/features/reports/
+  data/          repository implementations, Firestore / Storage / HTTP / local storage access
+  domain/        models and repository interfaces (no Flutter, no Firebase)
+  viewmodel/     ViewModels: the state and actions of each screen
+  presentation/  screens and widgets
+  services/      optional: feature-wide services (schedulers, sync, isolates)
+```
+
+Code shared by several features goes in `lib/core/` (`core/widgets`, `core/network`, `core/theme`…).
+
+`lib/models`, `lib/views`, `lib/viewmodels`, `lib/services`, `lib/DAOs` and `lib/utils` are the old flat layout. Do not add files there; when you change one of those files, move it into its feature.
+
+### Names
+
+| What | File | Class |
+|---|---|---|
+| Screen | `report_lost_item_screen.dart` in `presentation/` | `ReportLostItemScreen` |
+| ViewModel | `report_lost_item_view_model.dart` in `viewmodel/` | `ReportLostItemViewModel extends ChangeNotifier` |
+| Repository interface | `lost_report_repository.dart` in `domain/` | `LostReportRepository` |
+| Repository implementation | `lost_report_repository_impl.dart` in `data/` | `LostReportRepositoryImpl` |
+| Model | `lost_report.dart` in `domain/` | `LostReport` |
+
+- Screen state goes in a **ViewModel**, never in a class called `…Controller`. (`TextEditingController`, `AnimationController` and other Flutter controllers are fine.)
+- Use `_view_model.dart`, not `_viewmodel.dart`.
+- Files and folders are `snake_case`; classes are `UpperCamelCase`.
+
+### Layers
+
+- Widgets only build UI and call the ViewModel.
+- ViewModels hold state and call repositories. They do not use `BuildContext`, `Navigator` or widgets.
+- Only `data/` talks to Firebase, HTTP or local storage. No `FirebaseFirestore.instance`, `FirebaseAuth.instance` or `FirebaseStorage.instance` in widgets or ViewModels.
+- Dependencies come in through the constructor, with the production class as the default, so tests can pass fakes.
+
+### Errors and logs
+
+- No `print`; use `debugPrint` for the technical reason.
+- Show the user a short message; never swallow an exception with an empty `catch`.
+
+### Tests
+
+- New ViewModel or repository logic comes with unit tests that use the fakes in `test/support`.
