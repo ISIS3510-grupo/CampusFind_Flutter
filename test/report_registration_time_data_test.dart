@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/firestore_fakes.dart';
+import 'support/auth_fakes.dart';
 import 'support/registration_time_fakes.dart';
 
 Map<String, dynamic> sample(
@@ -24,10 +25,16 @@ void main() {
   final now = DateTime.utc(2026, 9, 30);
   const aggregatePath = 'analytics/reportRegistrationTime';
 
-  test('metrics use unique auto IDs, server timestamp and exactly five anonymous fields', () async {
+  test('metrics include current UID, unique auto IDs and server timestamp', () async {
     final database = FakeFirestore();
-    final repository = ReportRegistrationMetricRepository(firestore: database);
+    final user = FakeFirebaseUser(uid: 'student-1');
+    final auth = FakeFirebaseAuthClient(signInUser: user)..currentUser = user;
+    final repository = ReportRegistrationMetricRepository(
+      firestore: database,
+      firebaseAuth: auth,
+    );
     for (final type in ['lost', 'found']) {
+      auth.currentUser = FakeFirebaseUser(uid: 'student-$type');
       await repository.record(
         reportType: type,
         durationMs: type == 'lost' ? 842 : 0,
@@ -40,12 +47,26 @@ void main() {
     for (var i = 0; i < 2; i++) {
       expect(database.documentWrites[i]['data'], {
         'metricType': 'report_registration',
+        'uid': i == 0 ? 'student-lost' : 'student-found',
         'reportType': i == 0 ? 'lost' : 'found',
         'platform': 'flutter',
         'durationMs': i == 0 ? 842 : 0,
         'recordedAt': FieldValue.serverTimestamp(),
       });
     }
+  });
+
+  test('metrics are skipped safely without an authenticated user', () async {
+    final database = FakeFirestore();
+    final auth = FakeFirebaseAuthClient(signInUser: FakeFirebaseUser());
+    final repository = ReportRegistrationMetricRepository(
+      firestore: database,
+      firebaseAuth: auth,
+    );
+    for (final type in ['lost', 'found']) {
+      await repository.record(reportType: type, durationMs: 842);
+    }
+    expect(database.documentWrites, isEmpty);
   });
 
   test(
@@ -73,7 +94,11 @@ void main() {
       writeErrors: {'performanceMetrics/auto-1': error},
     );
     await expectLater(
-      ReportRegistrationMetricRepository(firestore: database)
+      ReportRegistrationMetricRepository(
+        firestore: database,
+        firebaseAuth: FakeFirebaseAuthClient(signInUser: FakeFirebaseUser())
+          ..currentUser = FakeFirebaseUser(),
+      )
           .record(reportType: 'found', durationMs: 1),
       throwsA(same(error)),
     );

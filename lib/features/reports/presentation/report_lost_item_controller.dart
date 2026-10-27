@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:campusfind_flutter/features/analytics/services/report_registration_performance_tracker.dart';
 import 'package:campusfind_flutter/features/reports/data/photo_labeler.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report_repository.dart';
@@ -7,9 +8,14 @@ import 'package:campusfind_flutter/features/reports/domain/photo_suggestion.dart
 
 // Keeps the form state; the screen only renders it and forwards user actions.
 class ReportLostItemController extends ChangeNotifier {
-  ReportLostItemController(this._repository, {this._photoLabeler});
+  ReportLostItemController(
+    this._repository, {
+    this._photoLabeler,
+    this._tracker = const ReportRegistrationPerformanceTracker(),
+  });
 
   final LostReportRepository _repository;
+  final ReportRegistrationPerformanceTracker _tracker;
   final PhotoLabeler? _photoLabeler;
   bool _disposed = false;
 
@@ -70,7 +76,10 @@ class ReportLostItemController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      return await _repository.submit(draft);
+      return await _tracker.measure(
+        reportType: 'lost',
+        operation: () => _repository.submit(draft),
+      );
     } catch (_) {
       errorMessage = 'Unable to send the report. Please try again.';
       return null;
