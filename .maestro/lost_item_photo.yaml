@@ -6,8 +6,8 @@ appId: com.campusfind.flutter
 - runFlow: login.yaml
 - runFlow: fill_lost_report.yaml
 - scrollUntilVisible:
-    element: "Take a photo \\(optional\\)"
-- tapOn: "Take a photo \\(optional\\)"
+    element: "Take a photo of a similar item, its box or receipt"
+- tapOn: "Take a photo of a similar item, its box or receipt"
 - tapOn:
     id: "com.android.camera2:id/shutter_button"
 - tapOn:

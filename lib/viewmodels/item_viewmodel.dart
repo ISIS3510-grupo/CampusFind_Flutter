@@ -1,113 +1,134 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:geolocator/geolocator.dart';
-
-import '../features/analytics/services/report_registration_performance_tracker.dart';
-import '../models/item_model.dart';
-import '../models/campus_locations.dart';
+import 'package:flutter/material.dart';
+ 
 import '../DAOs/item_dao.dart';
+import '../features/analytics/services/report_registration_performance_tracker.dart';
+import '../models/campus_locations.dart';
+import '../models/item_model.dart';
 import '../services/location_service.dart';
+ 
+ //itemviewmodel is incharge of logical vlaidations
 
 class ItemViewModel extends ChangeNotifier {
   ItemViewModel({
-    this._itemDao = const ItemDao(),
+    ItemDao itemDao = const ItemDao(),
     LocationService? locationService,
-    this._firebaseAuth,
-    this._tracker = const ReportRegistrationPerformanceTracker(),
-  }) : _locationService = locationService ?? LocationService();
-
+    FirebaseAuth? firebaseAuth,
+    ReportRegistrationPerformanceTracker tracker =
+        const ReportRegistrationPerformanceTracker(),
+  }) : _itemDao = itemDao,
+       _locationService = locationService ?? LocationService(),
+       _firebaseAuth = firebaseAuth,
+       _tracker = tracker;
+ 
   final ItemDao _itemDao;
   final LocationService _locationService;
   final FirebaseAuth? _firebaseAuth;
+  // Emilio's BQ: measures how long registering a report takes.
   final ReportRegistrationPerformanceTracker _tracker;
-
+ 
   bool isLoading = false;
   bool isLoadingLocation = false;
   String? errorMessage;
-
+ 
   List<CampusLocation> locations = defaultUniandesLocations;
   CampusLocation? selectedLocation;
-
-  /// Carga la ubicación GPS actual y prioriza mediante Google Maps API
-  Future<void> loadPrioritizedLocations() async {
+ 
+  /// Lee el GPS, ordena los edificios por cercania y preselecciona el primero.
+  void loadPrioritizedLocations() {
     isLoadingLocation = true;
     notifyListeners();
-
-    try {
-      Position position = await _locationService.getCurrentLocation();
-
-      locations = await _locationService.sortLocationsByGoogleMaps(
-        userLat: position.latitude,
-        userLng: position.longitude,
-        locations: defaultUniandesLocations,
-      );
-    } catch (_) {
-      locations = defaultUniandesLocations;
-    } finally {
+ 
+    _locationService.getCurrentLocation((position) {
+      if (position != null) {
+        locations = _locationService.sortByDistance(
+          userLat: position.latitude,
+          userLng: position.longitude,
+          locations: defaultUniandesLocations,
+        );
+      } else {
+        locations = defaultUniandesLocations;
+      }
       selectedLocation = locations.isNotEmpty ? locations.first : null;
       isLoadingLocation = false;
       notifyListeners();
-    }
+    });
   }
-
+ 
   void selectLocation(CampusLocation? location) {
     selectedLocation = location;
     notifyListeners();
   }
-
-  Future<bool> reportItem({
+ 
+  /// Crea el reporte. El resultado llega por [onDone] (true = guardado).
+  void reportItem({
     required String reportType,
     required String title,
     required String description,
     required String category,
-  }) async {
-    if (isLoading) return false;
+    required void Function(bool ok) onDone,
+  }) {
+    if (isLoading) return;//tells if there is a process 
+ 
+    final userUid = (_firebaseAuth ?? FirebaseAuth.instance).currentUser?.uid;
+    final building = selectedLocation;
+ 
+    if (userUid == null || userUid.isEmpty) {
+      errorMessage = 'Please sign in before reporting an item.';
+      notifyListeners();
+      onDone(false);
+      return;
+    }
+    if (building == null) {
+      errorMessage = 'Please select a location.';
+      notifyListeners();
+      onDone(false);
+      return;
+    }
+ 
     isLoading = true;
     errorMessage = null;
     notifyListeners();
-
-    try {
-      final userUid = (_firebaseAuth ?? FirebaseAuth.instance).currentUser?.uid;
-      if (userUid == null || userUid.isEmpty) {
-        throw StateError('Please sign in before reporting an item.');
-      }
-      await _tracker.measure(
-        reportType: reportType,
-        operation: () async {
-          // The building suggested by GPS (or picked by the student) is the
-          // reported place; the raw GPS position is only a fallback.
-          final building = selectedLocation;
-          final GeoPoint location;
-          if (building != null) {
-            location = GeoPoint(building.latitude, building.longitude);
-          } else {
-            final position = await _locationService.getCurrentLocation();
-            location = GeoPoint(position.latitude, position.longitude);
-          }
-          final item = ItemModel(
-            title: title,
-            description: description,
-            category: category,
-            location: location,
-          );
-          await _itemDao.insertItem(
-            item,
-            reportType: reportType,
-            userUid: userUid,
-            locationName: building?.name,
-          );
-        },
-      );
-
-      isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      isLoading = false;
-      errorMessage = e.toString();
-      notifyListeners();
-      return false;
-    }
+ 
+    final item = ItemModel(
+      title: title,
+      description: description,
+      category: category,
+      location: GeoPoint(building.latitude, building.longitude),
+    );
+ 
+    // The DAO answers with callbacks; the Completer turns them into the
+    // Future the tracker measures, so the time covers the whole save.
+    _tracker
+        .measure<void>(
+          reportType: reportType,
+          operation: () {
+            final saved = Completer<void>();
+            _itemDao.insertItem(
+              item,
+              reportType: reportType,
+              userUid: userUid,
+              locationName: building.name,
+              onSuccess: saved.complete,
+              onError: saved.completeError,
+            );
+            return saved.future;
+          },
+        )
+        .then((_) {
+          isLoading = false;
+          notifyListeners();
+          onDone(true);
+        })
+        .catchError((Object error) {
+          isLoading = false;
+          errorMessage = error.toString();
+          notifyListeners();
+          onDone(false);
+        });
   }
 }
+ 

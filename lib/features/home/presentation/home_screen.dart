@@ -1,3 +1,4 @@
+import 'package:campusfind_flutter/core/widgets/storage_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/data/found_item_repository.dart';
@@ -72,7 +73,12 @@ class _HomeScreenState extends State<HomeScreen> {
           matchingConfigRepository: widget.matchingConfigRepository,
           createMatchingService: widget.createMatchingService,
         );
-    _viewModel.loadHome();
+    _viewModel.loadHome().then((_) {
+      // Counted once per visit, when Home shows the student's own report.
+      if (mounted && _viewModel.activeReport != null) {
+        widget.featureUsageTracker.track(AppFeature.viewMyReport);
+      }
+    });
   }
 
   @override
@@ -375,7 +381,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final location = report.locationName.trim();
     final age = reportAge(report.reportedAt);
     final subtitle = location.isEmpty ? age : 'Lost in $location · $age';
-    final imageUrl = report.imageUrl?.trim();
     const placeholder = Center(
       child: Icon(Icons.image, size: 26, color: Color(0xFF999798)),
     );
@@ -409,14 +414,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 92,
                   height: 96,
                   color: const Color(0xFFE2DEDE),
-                  child: imageUrl == null || imageUrl.isEmpty
-                      ? placeholder
-                      : Image.network(
-                          imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              placeholder,
-                        ),
+                  child: StorageImage(
+                    path: report.photoPath,
+                    placeholder: placeholder,
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
