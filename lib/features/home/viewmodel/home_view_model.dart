@@ -2,92 +2,130 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/data/found_item_repository.dart';
 import '../../../core/data/lost_report_repository.dart';
-import '../../../core/models/lost_report.dart';
 import '../../auth/data/auth_service.dart';
-import '../../matching/data/matching_config_repository.dart';
+import '../../matching/data/persisted_match_repository.dart';
 import '../../matching/domain/match_result.dart';
-import '../../matching/services/basic_matching_strategy.dart';
-import '../../matching/services/matching_service.dart';
+import 'active_report_item.dart';
 
 class HomeViewModel extends ChangeNotifier {
   HomeViewModel({
     this.authService = const AuthService(),
     this.lostReportRepository = const LostReportRepository(),
     this.foundItemRepository = const FoundItemRepository(),
-    this.matchingConfigRepository = const MatchingConfigRepository(),
-    MatchingService Function(double threshold)? createMatchingService,
-  }) : createMatchingService = createMatchingService ?? _defaultMatchingService;
+    this.persistedMatchRepository = const PersistedMatchRepository(),
+  });
 
   final AuthService authService;
   final LostReportRepository lostReportRepository;
   final FoundItemRepository foundItemRepository;
-  final MatchingConfigRepository matchingConfigRepository;
-  // The service needs the threshold loaded from configuration.
-  final MatchingService Function(double threshold) createMatchingService;
+  final PersistedMatchRepository persistedMatchRepository;
 
-  LostReport? _activeReport;
-  MatchResult? _bestMatch;
+  List<ActiveReportItem> _activeReports = const [];
+  final Set<String> _openingMatches = {};
   bool _isLoading = false;
   String? _errorMessage;
   bool _isSigningOut = false;
   String? _signOutError;
   bool _disposed = false;
 
-  LostReport? get activeReport => _activeReport;
-  MatchResult? get bestMatch => _bestMatch;
+  List<ActiveReportItem> get activeReports => _activeReports;
+  bool isOpeningMatch(String reportId) => _openingMatches.contains(reportId);
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isSigningOut => _isSigningOut;
   String? get signOutError => _signOutError;
 
-  static MatchingService _defaultMatchingService(double threshold) {
-    return MatchingService(
-      strategy: const BasicMatchingStrategy(),
-      threshold: threshold,
-    );
-  }
-
   Future<void> loadHome() async {
     if (_isLoading || _isSigningOut || _disposed) return;
     _isLoading = true;
-    _activeReport = null;
-    _bestMatch = null;
+    _activeReports = const [];
     _errorMessage = null;
     notifyListeners();
 
     String? userId;
-    LostReport? report;
-    MatchResult? bestMatch;
-    String? error;
     try {
       userId = authService.currentUserId;
       if (userId == null || userId.isEmpty) return;
 
-      report = await lostReportRepository.getActiveReport(userId);
+      final reports = await lostReportRepository.getActiveReports(userId);
       if (_disposed || authService.currentUserId != userId) return;
-      if (report == null) return;
-
-      final foundItems = await foundItemRepository.getAvailableItems();
+      // Defensive cap for injected repositories; production also limits reads.
+      final visible =
+          reports
+              .where(
+                (report) =>
+                    report.ownerUid == userId && report.status != 'closed',
+              )
+              .toList()
+            ..sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+      _activeReports = List.unmodifiable(
+        visible.take(5).map((report) => ActiveReportItem(report: report)),
+      );
+      if (_activeReports.isEmpty) return;
+      notifyListeners(); // Reports remain visible while match lookups finish.
+      final matched = await Future.wait(
+        _activeReports.map((item) async {
+          try {
+            final match = await persistedMatchRepository.getBestMatch(
+              userId!,
+              item.report.id,
+            );
+            return ActiveReportItem(report: item.report, possibleMatch: match);
+          } catch (error) {
+            debugPrint('Possible match lookup failed: $error');
+            return item;
+          }
+        }),
+      );
       if (_disposed || authService.currentUserId != userId) return;
-      final threshold = await matchingConfigRepository.getMatchingThreshold();
-      if (_disposed || authService.currentUserId != userId) return;
-
-      final service = createMatchingService(threshold);
-      final results = service.findPossibleMatches(report, foundItems);
-      bestMatch = results.isEmpty ? null : results.first;
-    } catch (_) {
-      error = report == null
-          ? 'Unable to load your active report.'
-          : 'Unable to check possible matches.';
+      _activeReports = List.unmodifiable(matched);
+    } catch (error) {
+      debugPrint('Active reports could not be loaded: $error');
+      if (!_disposed) {
+        _errorMessage = 'Unable to load your active reports.';
+      }
     } finally {
       _isLoading = false;
       if (!_disposed) {
         final sameUser = userId != null && authService.currentUserId == userId;
-        _activeReport = sameUser ? report : null;
-        _bestMatch = sameUser ? bestMatch : null;
-        _errorMessage = error;
+        if (!sameUser) {
+          _activeReports = const [];
+          _errorMessage = null;
+        }
         notifyListeners();
       }
+    }
+  }
+
+  Future<MatchResult?> openPossibleMatch(ActiveReportItem item) async {
+    final uid = authService.currentUserId;
+    final match = item.possibleMatch;
+    if (_disposed ||
+        _isSigningOut ||
+        uid == null ||
+        item.report.ownerUid != uid ||
+        match == null ||
+        !_activeReports.contains(item) ||
+        !_openingMatches.add(item.report.id)) {
+      return null;
+    }
+    notifyListeners();
+    try {
+      final found = await foundItemRepository.getById(match.foundItemId);
+      if (_disposed ||
+          _isSigningOut ||
+          authService.currentUserId != uid ||
+          !_activeReports.contains(item) ||
+          found == null) {
+        return null;
+      }
+      return MatchResult(foundItem: found, score: match.score);
+    } catch (error) {
+      debugPrint('Possible match item could not be loaded: $error');
+      return null;
+    } finally {
+      _openingMatches.remove(item.report.id);
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -99,8 +137,7 @@ class HomeViewModel extends ChangeNotifier {
     try {
       await authService.signOut();
       if (_disposed) return false;
-      _activeReport = null;
-      _bestMatch = null;
+      _activeReports = const [];
       return true;
     } catch (_) {
       if (!_disposed) _signOutError = 'Unable to sign out. Please try again.';

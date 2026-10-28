@@ -7,6 +7,16 @@ class FoundItemRepository {
 
   final FirebaseFirestore? firestore;
 
+  Future<FoundItem?> getById(String foundItemId) async {
+    if (foundItemId.trim().isEmpty) return null;
+    final snapshot = await (firestore ?? FirebaseFirestore.instance)
+        .collection('foundItems')
+        .doc(foundItemId)
+        .get();
+    final data = snapshot.data();
+    return data == null ? null : FoundItem.fromFirestore(foundItemId, data);
+  }
+
   Future<List<FoundItem>> getAvailableItems() async {
     final snapshot = await (firestore ?? FirebaseFirestore.instance)
         .collection('foundItems')

@@ -3,15 +3,14 @@ import 'package:flutter/material.dart';
 
 import '../../../core/data/found_item_repository.dart';
 import '../../../core/data/lost_report_repository.dart';
-import '../../../core/models/lost_report.dart';
 import '../../../core/utils/report_age.dart';
 import '../../../views/report_item_screen.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../../drop_off/presentation/drop_off_instructions_screen.dart';
-import '../../matching/data/matching_config_repository.dart';
+import '../../matching/data/persisted_match_repository.dart';
 import '../../matching/presentation/match_alert_screen.dart';
-import '../../matching/services/matching_service.dart';
+import '../viewmodel/active_report_item.dart';
 import '../viewmodel/home_view_model.dart';
 import '../../analytics/data/firestore_feature_usage_tracker.dart';
 import '../../analytics/domain/app_feature.dart';
@@ -26,8 +25,7 @@ class HomeScreen extends StatefulWidget {
     this.authService = const AuthService(),
     this.lostReportRepository = const LostReportRepository(),
     this.foundItemRepository = const FoundItemRepository(),
-    this.matchingConfigRepository = const MatchingConfigRepository(),
-    this.createMatchingService,
+    this.persistedMatchRepository = const PersistedMatchRepository(),
     this.viewModel,
     this.dropOffBuilder,
     this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
@@ -37,8 +35,7 @@ class HomeScreen extends StatefulWidget {
   final AuthService authService;
   final LostReportRepository lostReportRepository;
   final FoundItemRepository foundItemRepository;
-  final MatchingConfigRepository matchingConfigRepository;
-  final MatchingService Function(double threshold)? createMatchingService;
+  final PersistedMatchRepository persistedMatchRepository;
   // Injected ViewModels remain owned by the caller.
   final HomeViewModel? viewModel;
   // Receives the same Home configuration for S12's Back to Home action.
@@ -70,12 +67,11 @@ class _HomeScreenState extends State<HomeScreen> {
           authService: widget.authService,
           lostReportRepository: widget.lostReportRepository,
           foundItemRepository: widget.foundItemRepository,
-          matchingConfigRepository: widget.matchingConfigRepository,
-          createMatchingService: widget.createMatchingService,
+          persistedMatchRepository: widget.persistedMatchRepository,
         );
     _viewModel.loadHome().then((_) {
       // Counted once per visit, when Home shows the student's own report.
-      if (mounted && _viewModel.activeReport != null) {
+      if (mounted && _viewModel.activeReports.isNotEmpty) {
         widget.featureUsageTracker.track(AppFeature.viewMyReport);
       }
     });
@@ -87,15 +83,14 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _openMatchAlert() {
-    final report = _viewModel.activeReport;
-    final match = _viewModel.bestMatch;
-    if (report == null || match == null) return;
+  Future<void> _openMatchAlert(ActiveReportItem item) async {
+    final match = await _viewModel.openPossibleMatch(item);
+    if (!mounted || match == null) return;
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) =>
-            MatchAlertScreen(lostReport: report, matchResult: match),
+            MatchAlertScreen(lostReport: item.report, matchResult: match),
       ),
     );
   }
@@ -105,8 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
       authService: _viewModel.authService,
       lostReportRepository: _viewModel.lostReportRepository,
       foundItemRepository: _viewModel.foundItemRepository,
-      matchingConfigRepository: _viewModel.matchingConfigRepository,
-      createMatchingService: _viewModel.createMatchingService,
+      persistedMatchRepository: _viewModel.persistedMatchRepository,
       dropOffBuilder: widget.dropOffBuilder,
     );
     Widget homeBuilder(BuildContext context) => home;
@@ -127,8 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final authService = _viewModel.authService;
       final lostReportRepository = _viewModel.lostReportRepository;
       final foundItemRepository = _viewModel.foundItemRepository;
-      final matchingConfigRepository = _viewModel.matchingConfigRepository;
-      final createMatchingService = _viewModel.createMatchingService;
+      final persistedMatchRepository = _viewModel.persistedMatchRepository;
       // Removes Home so the back button cannot reopen the signed-out session.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
@@ -138,8 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
               authService: authService,
               lostReportRepository: lostReportRepository,
               foundItemRepository: foundItemRepository,
-              matchingConfigRepository: matchingConfigRepository,
-              createMatchingService: createMatchingService,
+              persistedMatchRepository: persistedMatchRepository,
             ),
           ),
         ),
@@ -300,13 +292,33 @@ class _HomeScreenState extends State<HomeScreen> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              semanticsLabel: 'Loading active report',
+                              semanticsLabel: 'Loading active reports',
                             ),
                           ),
                         ),
                       ),
-                    if (_viewModel.activeReport != null)
-                      _buildActiveReportSection(_viewModel.activeReport!),
+                    if (_viewModel.activeReports.isNotEmpty) ...[
+                      const SizedBox(height: 36),
+                      const Text(
+                        'My active reports',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 13),
+                      ListView.separated(
+                        primary: false,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: EdgeInsets.zero,
+                        itemCount: _viewModel.activeReports.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        itemBuilder: (_, index) => _buildActiveReportCard(
+                          _viewModel.activeReports[index],
+                        ),
+                      ),
+                    ],
                     if (_viewModel.errorMessage != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 16),
@@ -377,7 +389,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildActiveReportSection(LostReport report) {
+  Widget _buildActiveReportCard(ActiveReportItem item) {
+    final report = item.report;
     final location = report.locationName.trim();
     final age = reportAge(report.reportedAt);
     final subtitle = location.isEmpty ? age : 'Lost in $location · $age';
@@ -388,18 +401,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 36),
-        const Text(
-          'My active report',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-            height: 1.2,
-          ),
-        ),
-        const SizedBox(height: 13),
         Container(
+          key: ValueKey('active-report-${report.id}'),
           constraints: const BoxConstraints(minHeight: 116),
           padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
           decoration: BoxDecoration(
@@ -450,7 +453,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         height: 1.2,
                       ),
                     ),
-                    if (_viewModel.bestMatch != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      item.statusLabel,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    if (item.possibleMatch != null) ...[
                       const SizedBox(height: 16),
                       Semantics(
                         button: true,
@@ -461,7 +469,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: InkWell(
-                            onTap: _openMatchAlert,
+                            onTap: _viewModel.isOpeningMatch(report.id)
+                                ? null
+                                : () => _openMatchAlert(item),
                             borderRadius: BorderRadius.circular(10),
                             child: const SizedBox(
                               width: 120,
