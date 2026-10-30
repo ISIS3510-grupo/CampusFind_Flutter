@@ -9,8 +9,8 @@ import '../features/analytics/services/report_registration_performance_tracker.d
 import '../models/campus_locations.dart';
 import '../models/item_model.dart';
 import '../services/location_service.dart';
- 
- //itemviewmodel is incharge of logical vlaidations
+
+//itemviewmodel is incharge of logical vlaidations
 
 class ItemViewModel extends ChangeNotifier {
   ItemViewModel({
@@ -29,19 +29,19 @@ class ItemViewModel extends ChangeNotifier {
   final FirebaseAuth? _firebaseAuth;
   // Emilio's BQ: measures how long registering a report takes.
   final ReportRegistrationPerformanceTracker _tracker;
- 
+
   bool isLoading = false;
   bool isLoadingLocation = false;
   String? errorMessage;
- 
+
   List<CampusLocation> locations = defaultUniandesLocations;
   CampusLocation? selectedLocation;
- 
+
   /// Lee el GPS, ordena los edificios por cercania y preselecciona el primero.
   void loadPrioritizedLocations() {
     isLoadingLocation = true;
     notifyListeners();
- 
+
     _locationService.getCurrentLocation((position) {
       if (position != null) {
         locations = _locationService.sortByDistance(
@@ -57,12 +57,12 @@ class ItemViewModel extends ChangeNotifier {
       notifyListeners();
     });
   }
- 
+
   void selectLocation(CampusLocation? location) {
     selectedLocation = location;
     notifyListeners();
   }
- 
+
   /// Crea el reporte. El resultado llega por [onDone] (true = guardado).
   void reportItem({
     required String reportType,
@@ -71,11 +71,11 @@ class ItemViewModel extends ChangeNotifier {
     required String category,
     required void Function(bool ok) onDone,
   }) {
-    if (isLoading) return;//tells if there is a process 
- 
+    if (isLoading) return; //tells if there is a process
+
     final userUid = (_firebaseAuth ?? FirebaseAuth.instance).currentUser?.uid;
     final building = selectedLocation;
- 
+
     if (userUid == null || userUid.isEmpty) {
       errorMessage = 'Please sign in before reporting an item.';
       notifyListeners();
@@ -88,11 +88,11 @@ class ItemViewModel extends ChangeNotifier {
       onDone(false);
       return;
     }
- 
+
     isLoading = true;
     errorMessage = null;
     notifyListeners();
- 
+
     final item = ItemModel(
       title: title,
       description: description,
@@ -105,6 +105,7 @@ class ItemViewModel extends ChangeNotifier {
     _tracker
         .measure<void>(
           reportType: reportType,
+          uid: userUid,
           operation: () {
             final saved = Completer<void>(); // Completer translates RemoteDataSource's callbacks 
             _itemRemoteDataSource.insertItem(
@@ -131,4 +132,3 @@ class ItemViewModel extends ChangeNotifier {
         });
   }
 }
- 

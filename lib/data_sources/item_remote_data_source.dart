@@ -40,7 +40,7 @@ class ItemRemoteDataSource {
     // Mapping: takes internal properties of items and transforms them into fields.
     final database = firestore ?? FirebaseFirestore.instance; // instance of Firebase that the data source uses
     final fields = <String, dynamic>{
-      'category': item.category,
+      'category': item.category.trim().toLowerCase(),
       'title': item.title,
       'locationName': locationName ?? 'Current location',
       'latitude': item.location.latitude,

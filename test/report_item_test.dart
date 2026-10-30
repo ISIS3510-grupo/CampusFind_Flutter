@@ -8,7 +8,7 @@ import 'package:campusfind_flutter/models/campus_locations.dart';
 import 'package:campusfind_flutter/models/item_model.dart';
 import 'package:campusfind_flutter/services/location_service.dart';
 import 'package:campusfind_flutter/viewmodels/item_viewmodel.dart';
-import 'package:campusfind_flutter/views/report_item_screen.dart';
+import 'package:campusfind_flutter/features/reports/presentation/report_item_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

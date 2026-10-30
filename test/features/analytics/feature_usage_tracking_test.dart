@@ -23,6 +23,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
+          authService: FakeAuthService(),
           featureUsageTracker: tracker,
           foundItemScreenBuilder: (_) => const Text('Found item form'),
         ),

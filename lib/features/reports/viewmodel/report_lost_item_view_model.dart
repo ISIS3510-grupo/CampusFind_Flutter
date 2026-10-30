@@ -1,15 +1,21 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:campusfind_flutter/features/analytics/services/report_registration_performance_tracker.dart';
 import 'package:campusfind_flutter/features/reports/data/photo_labeler.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report_repository.dart';
 import 'package:campusfind_flutter/features/reports/domain/photo_suggestion.dart';
 
 // Keeps the form state; the screen only renders it and forwards user actions.
-class ReportLostItemController extends ChangeNotifier {
-  ReportLostItemController(this._repository, {this._photoLabeler});
+class ReportLostItemViewModel extends ChangeNotifier {
+  ReportLostItemViewModel(
+    this._repository, {
+    this._photoLabeler,
+    this._tracker = const ReportRegistrationPerformanceTracker(),
+  });
 
   final LostReportRepository _repository;
+  final ReportRegistrationPerformanceTracker _tracker;
   final PhotoLabeler? _photoLabeler;
   bool _disposed = false;
 
@@ -24,11 +30,11 @@ class ReportLostItemController extends ChangeNotifier {
 
   Future<void> loadCategories() async {
     loadingCategories = true;
-    notifyListeners();
+    _notify();
 
     categories = await _repository.getCategories();
     loadingCategories = false;
-    notifyListeners();
+    _notify();
   }
 
   Future<void> analyzePhoto(String photoPath) async {
@@ -64,19 +70,23 @@ class ReportLostItemController extends ChangeNotifier {
   }
 
   Future<SubmitResult?> submit(LostReportDraft draft) async {
-    if (submitting) return null;
+    if (_disposed || submitting) return null;
     submitting = true;
     errorMessage = null;
-    notifyListeners();
+    _notify();
 
     try {
-      return await _repository.submit(draft);
+      return await _tracker.measure<SubmitResult>(
+        reportType: 'lost',
+        operation: () => _repository.submit(draft),
+        isSuccessful: (result) => result.status == SubmitStatus.submitted,
+      );
     } catch (_) {
       errorMessage = 'Unable to send the report. Please try again.';
       return null;
     } finally {
       submitting = false;
-      notifyListeners();
+      _notify();
     }
   }
 }

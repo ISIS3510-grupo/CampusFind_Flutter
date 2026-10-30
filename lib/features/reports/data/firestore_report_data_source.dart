@@ -77,7 +77,7 @@ class FirestoreReportDataSource {
 
     batch.set(_firestore.collection('lostReports').doc(reportId), {
       'ownerUid': uid,
-      'category': draft.category,
+      'category': draft.category.trim().toLowerCase(),
       'title': draft.title,
       'description': draft.description,
       'status': 'reported',
