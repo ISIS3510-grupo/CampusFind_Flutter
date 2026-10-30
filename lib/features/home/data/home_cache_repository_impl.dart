@@ -1,3 +1,6 @@
+import '../domain/home_cache_repository.dart';
+import '../domain/home_cache_snapshot.dart';
+
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,24 +8,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/models/lost_report.dart';
 import '../../../core/models/found_item.dart';
 import '../../matching/domain/persisted_match.dart';
-import '../viewmodel/active_report_item.dart';
-
-class HomeCacheSnapshot {
-  HomeCacheSnapshot({
-    required List<ActiveReportItem> items,
-    required this.cachedAt,
-  }) : items = List.unmodifiable(items);
-  static const ttl = Duration(minutes: 5);
-  final List<ActiveReportItem> items;
-  final DateTime cachedAt;
-  bool isExpired(DateTime now) => !now.isBefore(cachedAt.add(ttl));
-}
+import '../domain/active_report_item.dart';
 
 /// Versioned per-account snapshots. Expiry never deletes offline fallback data.
 /// Photo references are stored; image bytes are not downloaded by this cache.
-class HomeCacheRepository {
-  const HomeCacheRepository();
+class HomeCacheRepositoryImpl implements HomeCacheRepository {
+  const HomeCacheRepositoryImpl();
   String _key(String uid) => 'home_cache_v1_$uid';
+  @override
   Future<HomeCacheSnapshot?> load(String uid) async {
     try {
       final raw = (await SharedPreferences.getInstance()).getString(_key(uid));
@@ -62,6 +55,7 @@ class HomeCacheRepository {
     }
   }
 
+  @override
   Future<void> save(String uid, HomeCacheSnapshot snapshot) async {
     final data = {
       'cachedAt': snapshot.cachedAt.toIso8601String(),
@@ -90,6 +84,7 @@ class HomeCacheRepository {
     if (!saved) throw StateError('Home cache could not be saved');
   }
 
+  @override
   Future<void> clear(String uid) async {
     await (await SharedPreferences.getInstance()).remove(_key(uid));
   }

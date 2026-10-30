@@ -1,16 +1,18 @@
+import '../../matching/domain/persisted_match_repository.dart';
+
 import 'package:campusfind_flutter/core/widgets/storage_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/data/found_item_repository.dart';
 import '../../../core/data/lost_report_repository.dart';
 import '../../../core/utils/report_age.dart';
-import '../../../views/report_item_screen.dart';
+import '../../reports/presentation/report_item_screen.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../../drop_off/presentation/drop_off_instructions_screen.dart';
-import '../../matching/data/persisted_match_repository.dart';
+import '../../matching/data/persisted_match_repository_impl.dart';
 import '../../matching/presentation/match_alert_screen.dart';
-import '../viewmodel/active_report_item.dart';
+import '../domain/active_report_item.dart';
 import '../viewmodel/home_view_model.dart';
 import '../../analytics/data/firestore_feature_usage_tracker.dart';
 import '../../analytics/domain/app_feature.dart';
@@ -25,7 +27,7 @@ class HomeScreen extends StatefulWidget {
     this.authService = const AuthService(),
     this.lostReportRepository = const LostReportRepository(),
     this.foundItemRepository = const FoundItemRepository(),
-    this.persistedMatchRepository = const PersistedMatchRepository(),
+    this.persistedMatchRepository = const PersistedMatchRepositoryImpl(),
     this.viewModel,
     this.dropOffBuilder,
     this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
@@ -90,7 +92,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openMatchAlert(ActiveReportItem item) async {
     final match = await _viewModel.openPossibleMatch(item);
-    if (!mounted || match == null) return;
+    if (!mounted) return;
+    if (match == null) {
+      final message = _viewModel.matchErrorMessage;
+      if (message != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+      return;
+    }
 
     _pushAndRefresh(
       MaterialPageRoute<void>(
@@ -295,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const Padding(
                           padding: EdgeInsets.only(top: 16),
                           child: Text(
-                            'Offline ? showing previously loaded information',
+                            'Offline: showing previously loaded information',
                             style: TextStyle(fontSize: 13, color: Colors.grey),
                           ),
                         ),

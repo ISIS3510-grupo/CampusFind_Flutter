@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:campusfind_flutter/features/analytics/data/report_registration_metric_repository.dart';
+import 'package:campusfind_flutter/features/analytics/data/report_registration_metric_repository_impl.dart';
 import 'package:campusfind_flutter/features/analytics/services/report_registration_performance_tracker.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report.dart';
-import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_controller.dart';
+import 'package:campusfind_flutter/features/reports/viewmodel/report_lost_item_view_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,6 +19,36 @@ void main() {
     locationName: 'ML building',
   );
 
+  test(
+    'metric retains submitting UID when auth changes during upload',
+    () async {
+      final repository = _PendingRepository();
+      final database = FakeFirestore();
+      final user = FakeFirebaseUser(uid: 'original');
+      final auth = FakeFirebaseAuthClient(signInUser: user)..currentUser = user;
+      final model = ReportLostItemViewModel(
+        repository,
+        tracker: ReportRegistrationPerformanceTracker(
+          repository: ReportRegistrationMetricRepositoryImpl(
+            firestore: database,
+            firebaseAuth: auth,
+          ),
+        ),
+      );
+      addTearDown(model.dispose);
+      final pending = model.submit(draft);
+      auth.currentUser = FakeFirebaseUser(uid: 'replacement');
+      repository.pending.complete(
+        const SubmitResult('report-1', SubmitStatus.submitted),
+      );
+      await pending;
+      expect(
+        (database.documentWrites.single['data'] as Map)['uid'],
+        'original',
+      );
+    },
+  );
+
   for (final outcome in ['submitted', 'queued', 'failure']) {
     test(
       '$outcome preserves submission behavior and records only on success',
@@ -29,10 +59,10 @@ void main() {
         final auth = FakeFirebaseAuthClient(signInUser: user)
           ..currentUser = user;
         final stopwatch = Stopwatch();
-        final controller = ReportLostItemController(
+        final controller = ReportLostItemViewModel(
           repository,
           tracker: ReportRegistrationPerformanceTracker(
-            repository: ReportRegistrationMetricRepository(
+            repository: ReportRegistrationMetricRepositoryImpl(
               firestore: database,
               firebaseAuth: auth,
             ),
@@ -72,17 +102,21 @@ void main() {
           repository.pending.complete(result);
           expect(await submission, same(result));
           expect(controller.errorMessage, isNull);
-          expect(database.documentWrites.single, {
-            'path': 'performanceMetrics/auto-1',
-            'data': {
-              'metricType': 'report_registration',
-              'uid': 'student-1',
-              'reportType': 'lost',
-              'platform': 'flutter',
-              'durationMs': stopwatch.elapsedMilliseconds,
-              'recordedAt': FieldValue.serverTimestamp(),
-            },
-          });
+          if (outcome == 'queued') {
+            expect(database.documentWrites, isEmpty);
+          } else {
+            expect(database.documentWrites.single, {
+              'path': 'performanceMetrics/auto-1',
+              'data': {
+                'metricType': 'report_registration',
+                'uid': 'student-1',
+                'reportType': 'lost',
+                'platform': 'flutter',
+                'durationMs': stopwatch.elapsedMilliseconds,
+                'recordedAt': FieldValue.serverTimestamp(),
+              },
+            });
+          }
         }
         expect(repository.calls, 1);
         expect(stopwatch.isRunning, isFalse);

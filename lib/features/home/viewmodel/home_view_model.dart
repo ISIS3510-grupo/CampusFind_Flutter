@@ -1,21 +1,25 @@
+import '../domain/home_cache_repository.dart';
+import '../domain/home_cache_snapshot.dart';
+import '../../matching/domain/persisted_match_repository.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/data/found_item_repository.dart';
 import '../../../core/data/lost_report_repository.dart';
 import '../../auth/data/auth_service.dart';
-import '../../matching/data/persisted_match_repository.dart';
+import '../../matching/data/persisted_match_repository_impl.dart';
 import '../../matching/domain/match_result.dart';
-import '../data/home_cache_repository.dart';
-import 'active_report_item.dart';
+import '../data/home_cache_repository_impl.dart';
+import '../domain/active_report_item.dart';
 
 class HomeViewModel extends ChangeNotifier {
   HomeViewModel({
-    this.cacheRepository = const HomeCacheRepository(),
+    this.cacheRepository = const HomeCacheRepositoryImpl(),
     this.authService = const AuthService(),
     this.lostReportRepository = const LostReportRepository(),
     this.foundItemRepository = const FoundItemRepository(),
-    this.persistedMatchRepository = const PersistedMatchRepository(),
+    this.persistedMatchRepository = const PersistedMatchRepositoryImpl(),
   });
 
   final HomeCacheRepository cacheRepository;
@@ -30,6 +34,8 @@ class HomeViewModel extends ChangeNotifier {
   String? _errorMessage;
   bool _isSigningOut = false;
   String? _signOutError;
+  String? _matchErrorMessage;
+  String? get matchErrorMessage => _matchErrorMessage;
   bool _disposed = false;
 
   List<ActiveReportItem> get activeReports => _activeReports;
@@ -116,20 +122,43 @@ class HomeViewModel extends ChangeNotifier {
         );
         notifyListeners();
       }
-      // Publish and cache a complete snapshot only after all reads succeed.
+      final cachedById = {
+        for (final item in _snapshot?.items ?? <ActiveReportItem>[])
+          item.report.id: item,
+      };
+      var usedCachedMatch = false;
+      // Isolate bad records, while network/auth failures retain snapshot handling.
       final fresh = await Future.wait(
         visible.take(5).map((report) async {
-          final match = await persistedMatchRepository.getBestMatch(
-            uid,
-            report.id,
-          );
-          final found = match == null
-              ? null
-              : await foundItemRepository.getById(match.foundItemId);
+          try {
+            final match = await persistedMatchRepository.getBestMatch(
+              uid,
+              report.id,
+            );
+            final found = match == null
+                ? null
+                : await foundItemRepository.getById(match.foundItemId);
+            return ActiveReportItem(
+              report: report,
+              possibleMatch: match,
+              foundItem: found,
+            );
+          } on FirebaseException catch (error) {
+            if (_connectivityError(error) ||
+                error.code == 'permission-denied' ||
+                error.code == 'unauthenticated') {
+              rethrow;
+            }
+            debugPrint('Possible match lookup failed for ${report.id}: $error');
+          } on FormatException catch (error) {
+            debugPrint('Malformed possible match for ${report.id}: $error');
+          }
+          final cached = cachedById[report.id];
+          usedCachedMatch |= cached?.possibleMatch != null;
           return ActiveReportItem(
             report: report,
-            possibleMatch: match,
-            foundItem: found,
+            possibleMatch: cached?.possibleMatch,
+            foundItem: cached?.foundItem,
           );
         }),
       );
@@ -140,7 +169,7 @@ class HomeViewModel extends ChangeNotifier {
       );
       _snapshot = snapshot;
       _activeReports = snapshot.items;
-      _isShowingCachedData = false;
+      _isShowingCachedData = usedCachedMatch;
       _isOffline = false;
       notifyListeners();
       try {
@@ -162,6 +191,7 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   Future<MatchResult?> openPossibleMatch(ActiveReportItem item) async {
+    _matchErrorMessage = null;
     final uid = authService.currentUserId;
     final match = item.possibleMatch;
     if (_disposed ||
@@ -181,8 +211,11 @@ class HomeViewModel extends ChangeNotifier {
       if (_disposed ||
           _isSigningOut ||
           authService.currentUserId != uid ||
-          !_activeReports.contains(item) ||
-          found == null) {
+          !_activeReports.contains(item)) {
+        return null;
+      }
+      if (found == null) {
+        _matchErrorMessage = 'This possible match is no longer available.';
         return null;
       }
       return MatchResult(foundItem: found, score: match.score);
@@ -194,6 +227,9 @@ class HomeViewModel extends ChangeNotifier {
         _isShowingCachedData = true;
         _isOffline = true;
         return MatchResult(foundItem: item.foundItem!, score: match.score);
+      }
+      if (_sameUser(uid)) {
+        _matchErrorMessage = 'Unable to open this match. Please try again.';
       }
       debugPrint('Possible match item could not be loaded: $error');
       return null;

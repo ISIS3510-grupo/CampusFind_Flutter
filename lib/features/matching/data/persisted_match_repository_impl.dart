@@ -1,12 +1,15 @@
+import '../domain/persisted_match_repository.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../domain/persisted_match.dart';
 
-class PersistedMatchRepository {
-  const PersistedMatchRepository({this.firestore});
+class PersistedMatchRepositoryImpl implements PersistedMatchRepository {
+  const PersistedMatchRepositoryImpl({this.firestore});
 
   final FirebaseFirestore? firestore;
 
+  @override
   Future<PersistedMatch?> getBestMatch(String ownerUid, String reportId) async {
     if (ownerUid.trim().isEmpty || reportId.trim().isEmpty) return null;
     final snapshot = await (firestore ?? FirebaseFirestore.instance)

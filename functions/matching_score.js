@@ -34,8 +34,14 @@ function locationScore(lost, found) {
 
 function dateScore(reportedAt, createdAt) {
   // Match Flutter's Timestamp.toDate() and absolute Duration.inDays (whole days).
-  const lostDate = reportedAt?.toDate();
-  const foundDate = createdAt?.toDate();
+  let lostDate;
+  let foundDate;
+  try {
+    lostDate = typeof reportedAt?.toDate === "function" ? reportedAt.toDate() : null;
+    foundDate = typeof createdAt?.toDate === "function" ? createdAt.toDate() : null;
+  } catch (_) {
+    return 0;
+  }
   if (!(lostDate instanceof Date) || !(foundDate instanceof Date)) return 0;
   const days = Math.floor(Math.abs(lostDate.getTime() - foundDate.getTime()) / 86400000);
   if (days <= 1) return 1;
