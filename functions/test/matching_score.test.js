@@ -108,3 +108,15 @@ test("progressive bounds preserve full scores and inclusive threshold boundaries
     }
   }
 });
+
+test("malformed timestamps contribute zero without throwing", () => {
+  const invalid = [null, undefined, "date", 123, {}, { toDate: true },
+    { toDate: () => "not a Date" }, { toDate: () => new Date(NaN) },
+    { toDate: () => { throw new Error("invalid timestamp"); } }];
+  for (const value of invalid) {
+    close(scorePossibleMatch(lost({ reportedAt: value }),
+      found({ category: "electronics", createdAt: timestamp(0) }), 0), 0.4);
+    close(scorePossibleMatch(lost(),
+      found({ category: "electronics", createdAt: value }), 0), 0.4);
+  }
+});
