@@ -12,7 +12,7 @@ class FoundItemRepository {
     final snapshot = await (firestore ?? FirebaseFirestore.instance)
         .collection('foundItems')
         .doc(foundItemId)
-        .get();
+        .get(const GetOptions(source: Source.server));
     final data = snapshot.data();
     return data == null ? null : FoundItem.fromFirestore(foundItemId, data);
   }

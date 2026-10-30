@@ -15,7 +15,7 @@ class PersistedMatchRepository {
         .where('reportId', isEqualTo: reportId)
         .orderBy('score', descending: true)
         .limit(1)
-        .get();
+        .get(const GetOptions(source: Source.server));
     return snapshot.docs.isEmpty
         ? null
         : PersistedMatch.fromFirestore(snapshot.docs.first.data());

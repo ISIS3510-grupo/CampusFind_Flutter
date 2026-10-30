@@ -83,11 +83,16 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  Future<void> _pushAndRefresh(Route<void> route) async {
+    await Navigator.of(context).push(route);
+    if (mounted) await _viewModel.refresh();
+  }
+
   Future<void> _openMatchAlert(ActiveReportItem item) async {
     final match = await _viewModel.openPossibleMatch(item);
     if (!mounted || match == null) return;
 
-    Navigator.of(context).push(
+    _pushAndRefresh(
       MaterialPageRoute<void>(
         builder: (context) =>
             MatchAlertScreen(lostReport: item.report, matchResult: match),
@@ -105,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     Widget homeBuilder(BuildContext context) => home;
 
-    Navigator.of(context).push(
+    _pushAndRefresh(
       MaterialPageRoute<void>(
         builder: (context) =>
             widget.dropOffBuilder?.call(context, homeBuilder) ??
@@ -156,184 +161,197 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.white,
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Yellow header from the Figma design
-              Container(
-                height: 92,
-                color: const Color(0xFFFEFD05),
-                padding: const EdgeInsets.only(left: 22, right: 15),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(top: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'uniandes',
-                              style: TextStyle(
-                                fontSize: 25,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                                height: 1.2,
+        child: RefreshIndicator(
+          onRefresh: _viewModel.refresh,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Yellow header from the Figma design
+                Container(
+                  height: 92,
+                  color: const Color(0xFFFEFD05),
+                  padding: const EdgeInsets.only(left: 22, right: 15),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(top: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'uniandes',
+                                style: TextStyle(
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black,
+                                  height: 1.2,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 1),
-                            Text(
-                              'Lost & Found',
-                              style: TextStyle(
-                                fontSize: 25,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                                height: 1.2,
+                              SizedBox(height: 1),
+                              Text(
+                                'Lost & Found',
+                                style: TextStyle(
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black,
+                                  height: 1.2,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 1),
-                            Text(
-                              'Find or return an item',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w300,
-                                color: Colors.black,
-                                height: 1.2,
+                              SizedBox(height: 1),
+                              Text(
+                                'Find or return an item',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.black,
+                                  height: 1.2,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _viewModel.isSigningOut ? null : _signOut,
-                      tooltip: 'Sign out',
-                      constraints: const BoxConstraints.tightFor(
-                        width: 44,
-                        height: 44,
-                      ),
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        size: 28,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'What do you need?',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    HomeActionCard(
-                      icon: Icons.search,
-                      title: 'Search found items',
-                      subtitle: 'Check if something similar has already been registered.',
-                      large: true,
-                      onTap: () => widget.featureUsageTracker.track(
-                        AppFeature.searchFoundItems,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    HomeActionCard(
-                      icon: Icons.report_outlined,
-                      title: 'I lost an item',
-                      subtitle: 'Report it and get notified if it is found.',
-                      onTap: () {
-                        widget.featureUsageTracker.track(
-                          AppFeature.reportLostItem,
-                        );
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (context) => ReportLostItemScreen(
-                              featureUsageTracker: widget.featureUsageTracker,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    HomeActionCard(
-                      icon: Icons.add,
-                      title: 'I found an item',
-                      subtitle: 'Report it and see where to deliver it.',
-                      highlighted: true,
-                      onTap: () {
-                        widget.featureUsageTracker.track(
-                          AppFeature.reportFoundItem,
-                        );
-                        // Report screen with the GPS location of the item.
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: widget.foundItemScreenBuilder,
-                          ),
-                        );
-                      },
-                    ),
-                    if (_viewModel.isLoading)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 36),
-                        child: Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              semanticsLabel: 'Loading active reports',
-                            ),
+                            ],
                           ),
                         ),
                       ),
-                    if (_viewModel.activeReports.isNotEmpty) ...[
-                      const SizedBox(height: 36),
-                      const Text(
-                        'My active reports',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
+                      IconButton(
+                        onPressed: _viewModel.isSigningOut ? null : _signOut,
+                        tooltip: 'Sign out',
+                        constraints: const BoxConstraints.tightFor(
+                          width: 44,
+                          height: 44,
                         ),
-                      ),
-                      const SizedBox(height: 13),
-                      ListView.separated(
-                        primary: false,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: EdgeInsets.zero,
-                        itemCount: _viewModel.activeReports.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 12),
-                        itemBuilder: (_, index) => _buildActiveReportCard(
-                          _viewModel.activeReports[index],
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          size: 28,
+                          color: Colors.black,
                         ),
                       ),
                     ],
-                    if (_viewModel.errorMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Text(
-                          _viewModel.errorMessage!,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF999798),
-                          ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'What do you need?',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                          height: 1.2,
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 18),
+                      HomeActionCard(
+                        icon: Icons.search,
+                        title: 'Search found items',
+                        subtitle: 'Check if something similar has already been registered.',
+                        large: true,
+                        onTap: () => widget.featureUsageTracker.track(
+                          AppFeature.searchFoundItems,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      HomeActionCard(
+                        icon: Icons.report_outlined,
+                        title: 'I lost an item',
+                        subtitle: 'Report it and get notified if it is found.',
+                        onTap: () {
+                          widget.featureUsageTracker.track(
+                            AppFeature.reportLostItem,
+                          );
+                          _pushAndRefresh(
+                            MaterialPageRoute<void>(
+                              builder: (context) => ReportLostItemScreen(
+                                featureUsageTracker: widget.featureUsageTracker,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      HomeActionCard(
+                        icon: Icons.add,
+                        title: 'I found an item',
+                        subtitle: 'Report it and see where to deliver it.',
+                        highlighted: true,
+                        onTap: () {
+                          widget.featureUsageTracker.track(
+                            AppFeature.reportFoundItem,
+                          );
+                          // Report screen with the GPS location of the item.
+                          _pushAndRefresh(
+                            MaterialPageRoute<void>(
+                              builder: widget.foundItemScreenBuilder,
+                            ),
+                          );
+                        },
+                      ),
+                      if (_viewModel.isOffline)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 16),
+                          child: Text(
+                            'Offline ? showing previously loaded information',
+                            style: TextStyle(fontSize: 13, color: Colors.grey),
+                          ),
+                        ),
+                      if (_viewModel.isLoading)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 36),
+                          child: Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                semanticsLabel: 'Loading active reports',
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (_viewModel.activeReports.isNotEmpty) ...[
+                        const SizedBox(height: 36),
+                        const Text(
+                          'My active reports',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 13),
+                        ListView.separated(
+                          primary: false,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: EdgeInsets.zero,
+                          itemCount: _viewModel.activeReports.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (_, index) => _buildActiveReportCard(
+                            _viewModel.activeReports[index],
+                          ),
+                        ),
+                      ],
+                      if (_viewModel.errorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Text(
+                            _viewModel.errorMessage!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF999798),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -348,9 +366,10 @@ class _HomeScreenState extends State<HomeScreen> {
             child: BottomNavigationBar(
               currentIndex: 0,
               onTap: (index) {
+                if (index == 0) _viewModel.refresh();
                 // Alerts tab: notifications sent by the backend (Sofia).
                 if (index == 2) {
-                  Navigator.of(context).push(
+                  _pushAndRefresh(
                     MaterialPageRoute<void>(
                       builder: (context) => const NotificationsScreen(),
                     ),

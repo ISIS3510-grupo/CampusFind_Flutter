@@ -23,7 +23,7 @@ class LostReportRepository {
         )
         .orderBy('reportedAt', descending: true)
         .limit(limit.clamp(1, 5))
-        .get();
+        .get(const GetOptions(source: Source.server));
     return snapshot.docs
         .map((doc) => LostReport.fromFirestore(doc.id, doc.data()))
         .toList();
