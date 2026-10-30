@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CampusLocation {
   final String id;
@@ -13,6 +14,33 @@ class CampusLocation {
     required this.longitude,
   });
 
+  /// Crea una instancia desde un documento de Firestore.
+  factory CampusLocation.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    /* final geo = data['location'];
+    final double lat = geo is GeoPoint
+        ? geo.latitude
+        : (data['latitude'] as num?)?.toDouble() ?? 0.0;
+    final double lng = geo is GeoPoint
+        ? geo.longitude
+        : (data['longitude'] as num?)?.toDouble() ?? 0.0; */
+
+    return CampusLocation(
+      id: doc.id,
+      name: data['name'] ?? '',
+      latitude: (data['latitude'] as num).toDouble(),
+      longitude: (data['longitude'] as num).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
+  }
+
   double distanceTo(double lat, double lng) {
     const p = 0.017453292519943295;
     final a = 0.5 -
@@ -22,12 +50,13 @@ class CampusLocation {
   }
 }
 
+/// Lista de respaldo (fallback) en caso de fallar la consulta a Firestore o no haber conexión.
 const List<CampusLocation> defaultUniandesLocations = [
   CampusLocation(
     id: 'ML',
     name: 'Edificio Mario Laserna (ML)',
     latitude: 4.6031162,
-    longitude:-74.0651005,
+    longitude: -74.0651005,
   ),
   CampusLocation(
     id: 'Aulas',
@@ -43,7 +72,7 @@ const List<CampusLocation> defaultUniandesLocations = [
   ),
   CampusLocation(
     id: 'RGD',
-    name: 'Edificio Alberto Lleras Camargo (RGD)',
+    name: 'Centro Cívico',
     latitude: 4.6023860,
     longitude: -74.0660745,
   ),

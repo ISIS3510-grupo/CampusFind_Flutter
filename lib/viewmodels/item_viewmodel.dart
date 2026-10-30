@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
  
-import '../DAOs/item_dao.dart';
+import '../data_sources/item_remote_data_source.dart';
 import '../features/analytics/services/report_registration_performance_tracker.dart';
 import '../models/campus_locations.dart';
 import '../models/item_model.dart';
@@ -14,17 +14,17 @@ import '../services/location_service.dart';
 
 class ItemViewModel extends ChangeNotifier {
   ItemViewModel({
-    ItemDao itemDao = const ItemDao(),
+    ItemRemoteDataSource itemRemoteDataSource = const ItemRemoteDataSource(),
     LocationService? locationService,
     FirebaseAuth? firebaseAuth,
     ReportRegistrationPerformanceTracker tracker =
         const ReportRegistrationPerformanceTracker(),
-  }) : _itemDao = itemDao,
+  }) : _itemRemoteDataSource = itemRemoteDataSource,
        _locationService = locationService ?? LocationService(),
        _firebaseAuth = firebaseAuth,
        _tracker = tracker;
  
-  final ItemDao _itemDao;
+  final ItemRemoteDataSource _itemRemoteDataSource;
   final LocationService _locationService;
   final FirebaseAuth? _firebaseAuth;
   // Emilio's BQ: measures how long registering a report takes.
@@ -100,22 +100,22 @@ class ItemViewModel extends ChangeNotifier {
       location: GeoPoint(building.latitude, building.longitude),
     );
  
-    // The DAO answers with callbacks; the Completer turns them into the
-    // Future the tracker measures, so the time covers the whole save.
+    // The RemoteDataSource answers with callbacks, the Completer turns them into the
+    
     _tracker
         .measure<void>(
           reportType: reportType,
           operation: () {
-            final saved = Completer<void>();
-            _itemDao.insertItem(
+            final saved = Completer<void>(); // Completer translates RemoteDataSource's callbacks 
+            _itemRemoteDataSource.insertItem(
               item,
               reportType: reportType,
               userUid: userUid,
               locationName: building.name,
-              onSuccess: saved.complete,
-              onError: saved.completeError,
+              onSuccess: saved.complete, //callback success
+              onError: saved.completeError, //callback failure
             );
-            return saved.future;
+            return saved.future; // what is going to happen when RemoteDataSource is finished (ticket)
           },
         )
         .then((_) {
