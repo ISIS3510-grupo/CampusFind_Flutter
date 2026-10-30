@@ -7,6 +7,28 @@ class LostReportRepository {
 
   final FirebaseFirestore? firestore;
 
+  Future<List<LostReport>> getActiveReports(
+    String ownerUid, {
+    int limit = 5,
+  }) async {
+    if (ownerUid.trim().isEmpty || limit <= 0) return [];
+    // All non-closed statuses in the shared report lifecycle. An equality-list
+    // filter permits reportedAt ordering, unlike a status inequality ordering.
+    final snapshot = await (firestore ?? FirebaseFirestore.instance)
+        .collection('lostReports')
+        .where('ownerUid', isEqualTo: ownerUid)
+        .where(
+          'status',
+          whereIn: ['reported', 'found', 'ready_for_pickup', 'claimed'],
+        )
+        .orderBy('reportedAt', descending: true)
+        .limit(limit.clamp(1, 5))
+        .get(const GetOptions(source: Source.server));
+    return snapshot.docs
+        .map((doc) => LostReport.fromFirestore(doc.id, doc.data()))
+        .toList();
+  }
+
   Future<LostReport?> getActiveReport(String ownerUid) async {
     if (ownerUid.trim().isEmpty) return null;
 

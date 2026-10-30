@@ -25,7 +25,7 @@ class BiometricService {
         biometricOnly: true,
       );
     } on LocalAuthException {
-      // Cancellation, lockout, and unavailable biometrics leave S01 open.
+      // Cancellation, lockout, and unavailable biometric
       return false;
     } on PlatformException {
       return false;
