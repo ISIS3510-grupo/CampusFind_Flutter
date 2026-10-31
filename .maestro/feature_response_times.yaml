@@ -14,4 +14,12 @@ appId: com.campusfind.flutter
       visible: "While using the app"
     commands:
       - tapOn: "While using the app"
+- runFlow:
+    when:
+      visible: "No thanks"
+    commands:
+      - tapOn: "No thanks"
+- extendedWaitUntil:
+    visible: "Report Found Item"
+    timeout: 20000
 - back

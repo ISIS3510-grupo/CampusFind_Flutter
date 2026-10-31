@@ -58,6 +58,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final HomeViewModel _viewModel;
   late final bool _ownsViewModel;
+  final _homeLoadTime = Stopwatch();
 
   @override
   void initState() {
@@ -71,20 +72,29 @@ class _HomeScreenState extends State<HomeScreen> {
           foundItemRepository: widget.foundItemRepository,
           persistedMatchRepository: widget.persistedMatchRepository,
         );
-    final stopwatch = Stopwatch()..start();
-    _viewModel.loadHome().then((_) {
-      // Counted once per visit, when Home shows the student's own report.
-      if (mounted && _viewModel.activeReports.isNotEmpty) {
-        widget.featureUsageTracker.track(
-          AppFeature.viewMyReport,
-          responseTime: stopwatch.elapsed,
-        );
-      }
+    _homeLoadTime.start();
+    _viewModel.addListener(_trackMyReportShown);
+    _viewModel.loadHome();
+  }
+
+  // Counted once per visit, when Home shows the student's own report. The time
+  // ends at the first frame with the report, not when loadHome also saves the
+  // cache.
+  void _trackMyReportShown() {
+    if (!mounted || _viewModel.activeReports.isEmpty) return;
+    _viewModel.removeListener(_trackMyReportShown);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.featureUsageTracker.track(
+        AppFeature.viewMyReport,
+        responseTime: _homeLoadTime.elapsed,
+      );
     });
   }
 
   @override
   void dispose() {
+    _viewModel.removeListener(_trackMyReportShown);
     if (_ownsViewModel) _viewModel.dispose();
     super.dispose();
   }

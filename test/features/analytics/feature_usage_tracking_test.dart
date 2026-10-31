@@ -1,3 +1,4 @@
+import 'package:campusfind_flutter/features/analytics/data/firestore_feature_usage_tracker.dart';
 import 'package:campusfind_flutter/features/analytics/domain/app_feature.dart';
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
@@ -10,6 +11,19 @@ import '../reports/fake_lost_report_repository.dart';
 import 'fake_feature_usage_tracker.dart';
 
 void main() {
+  test('only response times the Firestore rule accepts are stored', () {
+    int? stored(int ms) => FirestoreFeatureUsageTracker.storedDurationMs(
+      Duration(milliseconds: ms),
+    );
+
+    expect(FirestoreFeatureUsageTracker.storedDurationMs(null), isNull);
+    expect(stored(0), 0);
+    expect(stored(850), 850);
+    expect(stored(599999), 599999);
+    expect(stored(600000), isNull);
+    expect(stored(-1), isNull);
+  });
+
   test('feature ids are unique and stable', () {
     final ids = AppFeature.values.map((feature) => feature.id).toList();
 
