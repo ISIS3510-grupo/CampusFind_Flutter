@@ -85,6 +85,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _viewModel.removeListener(_trackMyReportShown);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (_viewModel.activeReports.isEmpty) {
+        // The report went away before it was drawn: wait for the next one.
+        _viewModel.addListener(_trackMyReportShown);
+        return;
+      }
       widget.featureUsageTracker.track(
         AppFeature.viewMyReport,
         responseTime: _homeLoadTime.elapsed,
