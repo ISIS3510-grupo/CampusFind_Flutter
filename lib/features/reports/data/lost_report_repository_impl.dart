@@ -68,6 +68,9 @@ class LostReportRepositoryImpl implements LostReportRepository {
   }
 
   @override
+  Future<int> pendingCount() async => (await _pending.load()).length;
+
+  @override
   Future<int> syncPending() async {
     final reports = await _pending.load();
     if (!await _connectivity.isOnline()) return reports.length;

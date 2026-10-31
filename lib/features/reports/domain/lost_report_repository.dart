@@ -9,6 +9,9 @@ abstract class LostReportRepository {
 
   Future<SubmitResult> submit(LostReportDraft draft);
 
+  // How many reports are saved on the device waiting to be sent.
+  Future<int> pendingCount();
+
   // Sends the reports saved while offline. Returns how many are still waiting.
   Future<int> syncPending();
 }

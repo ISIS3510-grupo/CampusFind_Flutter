@@ -15,6 +15,9 @@ class FakeLostReportRepository implements LostReportRepository {
   final bool offline;
   int syncCalls = 0;
 
+  // What pendingCount returns: the reports waiting before the first sync.
+  int queued = 0;
+
   // What each syncPending call returns (reports still waiting); then 0.
   List<int> waitingAfterSync = [];
   final List<LostReportDraft> submitted = [];
@@ -35,6 +38,9 @@ class FakeLostReportRepository implements LostReportRepository {
       photoFailed: photoFailed,
     );
   }
+
+  @override
+  Future<int> pendingCount() async => queued;
 
   @override
   Future<int> syncPending() async {

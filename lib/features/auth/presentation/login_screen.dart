@@ -5,6 +5,7 @@ import '../../analytics/domain/app_feature.dart';
 import '../../analytics/domain/feature_usage_tracker.dart';
 import '../../analytics/presentation/analytics_dashboard_screen.dart';
 import '../../analytics/presentation/feature_usage_panel.dart';
+import '../../analytics/presentation/offline_sync_time_panel.dart';
 import '../../home/presentation/home_screen.dart';
 import '../data/auth_service.dart';
 import '../data/biometric_service.dart';
@@ -125,8 +126,9 @@ class _LoginScreenState extends State<LoginScreen> {
               // Jhostin's Type 3 BQ, next to the bottleneck and timing BQs.
               additionalPanels: [
                 FeatureUsagePanel(),
-                MatchReviewCard(),
-              ], //BQ Sofia
+                MatchReviewCard(), //BQ Sofia
+                OfflineSyncTimePanel(), // Type 1 BQ: sync time after offline
+              ],
             ),
       ),
     );

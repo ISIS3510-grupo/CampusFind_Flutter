@@ -1,14 +1,13 @@
 import 'dart:async';
-
-import 'package:campusfind_flutter/DAOs/item_dao.dart';
 import 'package:campusfind_flutter/core/data/found_item_repository.dart';
 import 'package:campusfind_flutter/core/data/lost_report_repository.dart';
+import 'package:campusfind_flutter/data_sources/item_remote_data_source.dart';
 import 'package:campusfind_flutter/features/analytics/services/report_registration_performance_tracker.dart';
+import 'package:campusfind_flutter/features/reports/presentation/report_item_screen.dart';
 import 'package:campusfind_flutter/models/campus_locations.dart';
 import 'package:campusfind_flutter/models/item_model.dart';
 import 'package:campusfind_flutter/services/location_service.dart';
 import 'package:campusfind_flutter/viewmodels/item_viewmodel.dart';
-import 'package:campusfind_flutter/features/reports/presentation/report_item_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -144,7 +143,7 @@ void main() {
     }
     final database = FakeFirestore();
     await expectLater(
-      _insert(ItemDao(firestore: database), reportType: 'invalid'),
+      _insert(ItemRemoteDataSource(firestore: database), reportType: 'invalid'),
       throwsA('Expected found or lost'),
     );
     expect(database.documentWrites, isEmpty);
@@ -157,7 +156,7 @@ void main() {
           if (value != null) 'appConfig/general': {'currentSemesterId': value},
         },
       );
-      await _insert(ItemDao(firestore: database), reportType: 'found');
+      await _insert(ItemRemoteDataSource(firestore: database), reportType: 'found');
       expect(database.documents['foundItems/auto-1']!['semesterId'], '2026-2');
     }
   });
@@ -221,9 +220,9 @@ Future<bool> _report(
   return done.future;
 }
 
-Future<void> _insert(ItemDao dao, {required String reportType}) {
+Future<void> _insert(ItemRemoteDataSource dataSource, {required String reportType}) {
   final done = Completer<void>();
-  dao.insertItem(
+  dataSource.insertItem(
     _item(),
     reportType: reportType,
     userUid: 'student-1',
@@ -251,7 +250,7 @@ ItemViewModel _model(
   final auth = FakeFirebaseAuthClient(signInUser: user)
     ..currentUser = authenticated ? user : null;
   return ItemViewModel(
-    itemDao: ItemDao(firestore: database),
+    itemRemoteDataSource: ItemRemoteDataSource(firestore: database),
     firebaseAuth: auth,
     locationService: gps,
     tracker: ReportRegistrationPerformanceTracker(

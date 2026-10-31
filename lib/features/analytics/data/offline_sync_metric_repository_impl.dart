@@ -39,7 +39,7 @@ class OfflineSyncMetricRepositoryImpl implements OfflineSyncMetricRepository {
       'platform': 'flutter',
       'durationMs': durationMs,
       'reportCount': reportCount,
-      if (offlineDurationMs != null) 'offlineDurationMs': offlineDurationMs,
+      'offlineDurationMs': ?offlineDurationMs,
       'recordedAt': FieldValue.serverTimestamp(),
     });
   }

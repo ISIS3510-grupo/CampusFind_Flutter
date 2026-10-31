@@ -1,4 +1,5 @@
 import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CampusLocation {
@@ -34,16 +35,13 @@ class CampusLocation {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'latitude': latitude,
-      'longitude': longitude,
-    };
+    return {'name': name, 'latitude': latitude, 'longitude': longitude};
   }
 
   double distanceTo(double lat, double lng) {
     const p = 0.017453292519943295;
-    final a = 0.5 -
+    final a =
+        0.5 -
         cos((lat - latitude) * p) / 2 +
         cos(latitude * p) * cos(lat * p) * (1 - cos((lng - longitude) * p)) / 2;
     return 12742000 * asin(sqrt(a));
