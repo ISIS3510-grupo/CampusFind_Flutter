@@ -1,3 +1,4 @@
+import 'package:campusfind_flutter/features/analytics/data/firestore_feature_usage_tracker.dart';
 import 'package:campusfind_flutter/features/analytics/domain/app_feature.dart';
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
@@ -10,6 +11,19 @@ import '../reports/fake_lost_report_repository.dart';
 import 'fake_feature_usage_tracker.dart';
 
 void main() {
+  test('only response times the Firestore rule accepts are stored', () {
+    int? stored(int ms) => FirestoreFeatureUsageTracker.storedDurationMs(
+      Duration(milliseconds: ms),
+    );
+
+    expect(FirestoreFeatureUsageTracker.storedDurationMs(null), isNull);
+    expect(stored(0), 0);
+    expect(stored(850), 850);
+    expect(stored(599999), 599999);
+    expect(stored(600000), isNull);
+    expect(stored(-1), isNull);
+  });
+
   test('feature ids are unique and stable', () {
     final ids = AppFeature.values.map((feature) => feature.id).toList();
 
@@ -40,6 +54,9 @@ void main() {
       AppFeature.searchFoundItems,
       AppFeature.reportFoundItem,
     ]);
+    // Opening a screen has a response time; the search card has nothing to wait for.
+    expect(tracker.responseTimes[AppFeature.reportFoundItem], isNotNull);
+    expect(tracker.responseTimes[AppFeature.searchFoundItems], isNull);
   });
 
   testWidgets('a submitted lost report is recorded once', (tester) async {
@@ -80,6 +97,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tracker.tracked, [AppFeature.submitLostReport]);
+    expect(tracker.responseTimes[AppFeature.submitLostReport], isNotNull);
   });
 
   testWidgets('a biometric login is recorded', (tester) async {
@@ -100,6 +118,7 @@ void main() {
 
     expect(find.text('Home'), findsOneWidget);
     expect(tracker.tracked, [AppFeature.biometricLogin]);
+    expect(tracker.responseTimes[AppFeature.biometricLogin], isNotNull);
   });
 
   testWidgets('a student password login is recorded', (tester) async {
@@ -128,5 +147,6 @@ void main() {
 
     expect(find.text('Home'), findsOneWidget);
     expect(tracker.tracked, [AppFeature.passwordLogin]);
+    expect(tracker.responseTimes[AppFeature.passwordLogin], isNotNull);
   });
 }

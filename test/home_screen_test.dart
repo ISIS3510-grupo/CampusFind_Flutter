@@ -1,3 +1,4 @@
+import 'package:campusfind_flutter/features/analytics/domain/app_feature.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
 import 'package:campusfind_flutter/features/home/viewmodel/home_view_model.dart';
 import 'package:campusfind_flutter/features/matching/presentation/match_alert_screen.dart';
@@ -40,6 +41,23 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('showing my report is recorded once with its load time', (
+    tester,
+  ) async {
+    final tracker = FakeFeatureUsageTracker();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(viewModel: model, featureUsageTracker: tracker),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(RefreshIndicator), const Offset(0, 400));
+    await tester.pumpAndSettle();
+
+    expect(tracker.tracked, [AppFeature.viewMyReport]);
+    expect(tracker.responseTimes[AppFeature.viewMyReport], isNotNull);
+  });
 
   testWidgets('pull refresh replaces report without logout', (tester) async {
     await pumpHome(tester);

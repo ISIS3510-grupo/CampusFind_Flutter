@@ -9,6 +9,7 @@ Firebase project and its deployed rules.
 | `report_with_private_detail.yaml` | Report plus its `lostReportPrivate` document |
 | `lost_item_photo.yaml` | Camera photo uploaded to `lostReports/{id}.jpg` (Sensor) |
 | `offline_queue.yaml` | Airplane mode: report queued, sent when back online (Context-aware) |
+| `feature_response_times.yaml` | Opens the report screens so feature uses are recorded with their response time (Type 5 BQ) |
 
 ## Run
 
