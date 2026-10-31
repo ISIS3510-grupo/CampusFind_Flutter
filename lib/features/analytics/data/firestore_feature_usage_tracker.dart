@@ -13,7 +13,7 @@ class FirestoreFeatureUsageTracker implements FeatureUsageTracker {
   const FirestoreFeatureUsageTracker();
 
   @override
-  void track(AppFeature feature) {
+  void track(AppFeature feature, {Duration? responseTime}) {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
@@ -25,6 +25,7 @@ class FirestoreFeatureUsageTracker implements FeatureUsageTracker {
             'feature': feature.id,
             'platform': 'flutter',
             'occurredAt': FieldValue.serverTimestamp(),
+            if (responseTime != null) 'durationMs': responseTime.inMilliseconds,
           });
       unawaited(
         write.then<void>(

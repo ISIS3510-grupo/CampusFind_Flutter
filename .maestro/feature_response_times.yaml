@@ -1,0 +1,17 @@
+# Type 5 BQ: opens the report screens from Home so the app records each
+# feature use with its response time (durationMs), without creating reports.
+appId: com.campusfind.flutter
+---
+- runFlow: login.yaml
+- tapOn: "I lost an item.*"
+- extendedWaitUntil:
+    visible: "Send report"
+    timeout: 20000
+- back
+- tapOn: "I found an item.*"
+- runFlow:
+    when:
+      visible: "While using the app"
+    commands:
+      - tapOn: "While using the app"
+- back

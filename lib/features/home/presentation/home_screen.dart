@@ -71,10 +71,14 @@ class _HomeScreenState extends State<HomeScreen> {
           foundItemRepository: widget.foundItemRepository,
           persistedMatchRepository: widget.persistedMatchRepository,
         );
+    final stopwatch = Stopwatch()..start();
     _viewModel.loadHome().then((_) {
       // Counted once per visit, when Home shows the student's own report.
       if (mounted && _viewModel.activeReports.isNotEmpty) {
-        widget.featureUsageTracker.track(AppFeature.viewMyReport);
+        widget.featureUsageTracker.track(
+          AppFeature.viewMyReport,
+          responseTime: stopwatch.elapsed,
+        );
       }
     });
   }
@@ -83,6 +87,19 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     if (_ownsViewModel) _viewModel.dispose();
     super.dispose();
+  }
+
+  // Opens a report screen and records the time until its first frame is drawn.
+  Future<void> _openReportScreen(AppFeature feature, Route<void> route) {
+    final stopwatch = Stopwatch()..start();
+    final opened = _pushAndRefresh(route);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.featureUsageTracker.track(
+        feature,
+        responseTime: stopwatch.elapsed,
+      );
+    });
+    return opened;
   }
 
   Future<void> _pushAndRefresh(Route<void> route) async {
@@ -271,10 +288,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: 'I lost an item',
                         subtitle: 'Report it and get notified if it is found.',
                         onTap: () {
-                          widget.featureUsageTracker.track(
+                          _openReportScreen(
                             AppFeature.reportLostItem,
-                          );
-                          _pushAndRefresh(
                             MaterialPageRoute<void>(
                               builder: (context) => ReportLostItemScreen(
                                 featureUsageTracker: widget.featureUsageTracker,
@@ -290,11 +305,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         subtitle: 'Report it and see where to deliver it.',
                         highlighted: true,
                         onTap: () {
-                          widget.featureUsageTracker.track(
-                            AppFeature.reportFoundItem,
-                          );
                           // Report screen with the GPS location of the item.
-                          _pushAndRefresh(
+                          _openReportScreen(
+                            AppFeature.reportFoundItem,
                             MaterialPageRoute<void>(
                               builder: widget.foundItemScreenBuilder,
                             ),

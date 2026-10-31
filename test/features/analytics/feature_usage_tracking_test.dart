@@ -40,6 +40,9 @@ void main() {
       AppFeature.searchFoundItems,
       AppFeature.reportFoundItem,
     ]);
+    // Opening a screen has a response time; the search card has nothing to wait for.
+    expect(tracker.responseTimes[AppFeature.reportFoundItem], isNotNull);
+    expect(tracker.responseTimes[AppFeature.searchFoundItems], isNull);
   });
 
   testWidgets('a submitted lost report is recorded once', (tester) async {
@@ -80,6 +83,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tracker.tracked, [AppFeature.submitLostReport]);
+    expect(tracker.responseTimes[AppFeature.submitLostReport], isNotNull);
   });
 
   testWidgets('a biometric login is recorded', (tester) async {
@@ -100,6 +104,7 @@ void main() {
 
     expect(find.text('Home'), findsOneWidget);
     expect(tracker.tracked, [AppFeature.biometricLogin]);
+    expect(tracker.responseTimes[AppFeature.biometricLogin], isNotNull);
   });
 
   testWidgets('a student password login is recorded', (tester) async {
@@ -128,5 +133,6 @@ void main() {
 
     expect(find.text('Home'), findsOneWidget);
     expect(tracker.tracked, [AppFeature.passwordLogin]);
+    expect(tracker.responseTimes[AppFeature.passwordLogin], isNotNull);
   });
 }
