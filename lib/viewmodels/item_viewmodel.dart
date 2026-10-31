@@ -3,45 +3,41 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
- 
+
 import '../DAOs/item_dao.dart';
 import '../features/analytics/services/report_registration_performance_tracker.dart';
 import '../models/campus_locations.dart';
 import '../models/item_model.dart';
 import '../services/location_service.dart';
- 
- //itemviewmodel is incharge of logical vlaidations
+
+//itemviewmodel is incharge of logical vlaidations
 
 class ItemViewModel extends ChangeNotifier {
   ItemViewModel({
-    ItemDao itemDao = const ItemDao(),
+    this._itemDao = const ItemDao(),
     LocationService? locationService,
-    FirebaseAuth? firebaseAuth,
-    ReportRegistrationPerformanceTracker tracker =
-        const ReportRegistrationPerformanceTracker(),
-  }) : _itemDao = itemDao,
-       _locationService = locationService ?? LocationService(),
-       _firebaseAuth = firebaseAuth,
-       _tracker = tracker;
- 
+    this._firebaseAuth,
+    this._tracker = const ReportRegistrationPerformanceTracker(),
+  }) : _locationService = locationService ?? LocationService();
+
   final ItemDao _itemDao;
   final LocationService _locationService;
   final FirebaseAuth? _firebaseAuth;
   // Emilio's BQ: measures how long registering a report takes.
   final ReportRegistrationPerformanceTracker _tracker;
- 
+
   bool isLoading = false;
   bool isLoadingLocation = false;
   String? errorMessage;
- 
+
   List<CampusLocation> locations = defaultUniandesLocations;
   CampusLocation? selectedLocation;
- 
+
   /// Lee el GPS, ordena los edificios por cercania y preselecciona el primero.
   void loadPrioritizedLocations() {
     isLoadingLocation = true;
     notifyListeners();
- 
+
     _locationService.getCurrentLocation((position) {
       if (position != null) {
         locations = _locationService.sortByDistance(
@@ -57,12 +53,12 @@ class ItemViewModel extends ChangeNotifier {
       notifyListeners();
     });
   }
- 
+
   void selectLocation(CampusLocation? location) {
     selectedLocation = location;
     notifyListeners();
   }
- 
+
   /// Crea el reporte. El resultado llega por [onDone] (true = guardado).
   void reportItem({
     required String reportType,
@@ -71,11 +67,11 @@ class ItemViewModel extends ChangeNotifier {
     required String category,
     required void Function(bool ok) onDone,
   }) {
-    if (isLoading) return;//tells if there is a process 
- 
+    if (isLoading) return; //tells if there is a process
+
     final userUid = (_firebaseAuth ?? FirebaseAuth.instance).currentUser?.uid;
     final building = selectedLocation;
- 
+
     if (userUid == null || userUid.isEmpty) {
       errorMessage = 'Please sign in before reporting an item.';
       notifyListeners();
@@ -88,23 +84,24 @@ class ItemViewModel extends ChangeNotifier {
       onDone(false);
       return;
     }
- 
+
     isLoading = true;
     errorMessage = null;
     notifyListeners();
- 
+
     final item = ItemModel(
       title: title,
       description: description,
       category: category,
       location: GeoPoint(building.latitude, building.longitude),
     );
- 
+
     // The DAO answers with callbacks; the Completer turns them into the
     // Future the tracker measures, so the time covers the whole save.
     _tracker
         .measure<void>(
           reportType: reportType,
+          uid: userUid,
           operation: () {
             final saved = Completer<void>();
             _itemDao.insertItem(
@@ -131,4 +128,3 @@ class ItemViewModel extends ChangeNotifier {
         });
   }
 }
- 

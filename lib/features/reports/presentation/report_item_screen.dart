@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
  
-import '../viewmodels/item_viewmodel.dart';
-import '../models/campus_locations.dart';
+import '../../../viewmodels/item_viewmodel.dart';
+import '../../../models/campus_locations.dart';
  
 class ReportItemScreen extends StatefulWidget {
   const ReportItemScreen({super.key, required this.reportType})
@@ -26,6 +26,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<ItemViewModel>().loadPrioritizedLocations();
     });
   }

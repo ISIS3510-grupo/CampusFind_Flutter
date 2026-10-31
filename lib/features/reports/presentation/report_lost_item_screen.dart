@@ -11,7 +11,7 @@ import 'package:campusfind_flutter/features/reports/data/photo_picker.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report.dart';
 import 'package:campusfind_flutter/features/reports/domain/lost_report_repository.dart';
 import 'package:campusfind_flutter/features/reports/domain/photo_suggestion.dart';
-import 'package:campusfind_flutter/features/reports/presentation/report_lost_item_controller.dart';
+import 'package:campusfind_flutter/features/reports/viewmodel/report_lost_item_view_model.dart';
 
 class ReportLostItemScreen extends StatefulWidget {
   const ReportLostItemScreen({
@@ -45,12 +45,12 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
   String? _category;
   String? _photoPath;
 
-  late final ReportLostItemController _controller;
+  late final ReportLostItemViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
-    _controller = ReportLostItemController(
+    _viewModel = ReportLostItemViewModel(
       widget.repository ?? LostReportRepositoryImpl(),
       photoLabeler: widget.photoLabeler,
     )..loadCategories();
@@ -58,7 +58,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    _viewModel.dispose();
     _title.dispose();
     _description.dispose();
     _location.dispose();
@@ -82,7 +82,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
       final path = await pick();
       if (path != null && mounted) {
         setState(() => _photoPath = path);
-        _controller.analyzePhoto(path);
+        _viewModel.analyzePhoto(path);
       }
     } catch (_) {
       if (!mounted) return;
@@ -93,13 +93,13 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
 
   void _removePhoto() {
     setState(() => _photoPath = null);
-    _controller.clearPhotoSuggestion();
+    _viewModel.clearPhotoSuggestion();
   }
 
   void _applySuggestion(PhotoSuggestion suggestion) {
     setState(() {
       final category = suggestion.category;
-      if (category != null && _controller.categories.contains(category)) {
+      if (category != null && _viewModel.categories.contains(category)) {
         _category = category;
       }
       final description = suggestion.description;
@@ -107,7 +107,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
         _description.text = description;
       }
     });
-    _controller.clearPhotoSuggestion();
+    _viewModel.clearPhotoSuggestion();
   }
 
   Widget _photoButton({
@@ -116,7 +116,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
     required VoidCallback onPressed,
   }) {
     return OutlinedButton.icon(
-      onPressed: _controller.submitting ? null : onPressed,
+      onPressed: _viewModel.submitting ? null : onPressed,
       icon: Icon(icon),
       label: Text(label, textAlign: TextAlign.center),
       style: OutlinedButton.styleFrom(
@@ -130,7 +130,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
   }
 
   Widget _buildPhotoSuggestion() {
-    if (_controller.analyzingPhoto) {
+    if (_viewModel.analyzingPhoto) {
       return const Padding(
         padding: EdgeInsets.only(top: 12),
         child: Row(
@@ -146,11 +146,11 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
         ),
       );
     }
-    final suggestion = _controller.photoSuggestion;
+    final suggestion = _viewModel.photoSuggestion;
     if (suggestion == null) return const SizedBox.shrink();
     final category = suggestion.category;
     final summary = [
-      if (category != null && _controller.categories.contains(category))
+      if (category != null && _viewModel.categories.contains(category))
         _label(category),
       if (suggestion.description != null) suggestion.description!,
     ].join(' · ');
@@ -183,7 +183,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: _controller.clearPhotoSuggestion,
+                onPressed: _viewModel.clearPhotoSuggestion,
                 child: const Text('Dismiss'),
               ),
               TextButton(
@@ -200,7 +200,8 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final result = await _controller.submit(
+    final stopwatch = Stopwatch()..start();
+    final result = await _viewModel.submit(
       LostReportDraft(
         title: _title.text.trim(),
         category: _category!,
@@ -213,7 +214,10 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
       ),
     );
     if (!mounted || result == null) return;
-    widget.featureUsageTracker.track(AppFeature.submitLostReport);
+    widget.featureUsageTracker.track(
+      AppFeature.submitLostReport,
+      responseTime: stopwatch.elapsed,
+    );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -261,7 +265,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
         ),
       ),
       body: ListenableBuilder(
-        listenable: _controller,
+        listenable: _viewModel,
         builder: (context, _) {
           return SafeArea(
             child: Form(
@@ -291,13 +295,13 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
                     initialValue: _category,
                     decoration: _decoration('Category'),
                     items: [
-                      for (final category in _controller.categories)
+                      for (final category in _viewModel.categories)
                         DropdownMenuItem(
                           value: category,
                           child: Text(_label(category)),
                         ),
                     ],
-                    onChanged: _controller.loadingCategories
+                    onChanged: _viewModel.loadingCategories
                         ? null
                         : (value) => setState(() => _category = value),
                     validator: (value) =>
@@ -393,7 +397,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
                         const SizedBox(width: 12),
                         const Expanded(child: Text('Photo added')),
                         TextButton(
-                          onPressed: _controller.submitting
+                          onPressed: _viewModel.submitting
                               ? null
                               : _removePhoto,
                           child: const Text('Remove'),
@@ -401,10 +405,10 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
                       ],
                     ),
                   _buildPhotoSuggestion(),
-                  if (_controller.errorMessage != null) ...[
+                  if (_viewModel.errorMessage != null) ...[
                     const SizedBox(height: 16),
                     Text(
-                      _controller.errorMessage!,
+                      _viewModel.errorMessage!,
                       style: const TextStyle(color: Colors.red),
                     ),
                   ],
@@ -419,8 +423,8 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      onPressed: _controller.submitting ? null : _submit,
-                      child: _controller.submitting
+                      onPressed: _viewModel.submitting ? null : _submit,
+                      child: _viewModel.submitting
                           ? const SizedBox(
                               width: 22,
                               height: 22,

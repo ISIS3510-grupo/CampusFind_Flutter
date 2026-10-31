@@ -1,17 +1,18 @@
+import '../../matching/domain/persisted_match_repository.dart';
+
 import 'package:campusfind_flutter/core/widgets/storage_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/data/found_item_repository.dart';
 import '../../../core/data/lost_report_repository.dart';
-import '../../../core/models/lost_report.dart';
 import '../../../core/utils/report_age.dart';
-import '../../../views/report_item_screen.dart';
+import '../../reports/presentation/report_item_screen.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../../drop_off/presentation/drop_off_instructions_screen.dart';
-import '../../matching/data/matching_config_repository.dart';
+import '../../matching/data/persisted_match_repository_impl.dart';
 import '../../matching/presentation/match_alert_screen.dart';
-import '../../matching/services/matching_service.dart';
+import '../domain/active_report_item.dart';
 import '../viewmodel/home_view_model.dart';
 import '../../analytics/data/firestore_feature_usage_tracker.dart';
 import '../../analytics/domain/app_feature.dart';
@@ -26,8 +27,7 @@ class HomeScreen extends StatefulWidget {
     this.authService = const AuthService(),
     this.lostReportRepository = const LostReportRepository(),
     this.foundItemRepository = const FoundItemRepository(),
-    this.matchingConfigRepository = const MatchingConfigRepository(),
-    this.createMatchingService,
+    this.persistedMatchRepository = const PersistedMatchRepositoryImpl(),
     this.viewModel,
     this.dropOffBuilder,
     this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
@@ -37,8 +37,7 @@ class HomeScreen extends StatefulWidget {
   final AuthService authService;
   final LostReportRepository lostReportRepository;
   final FoundItemRepository foundItemRepository;
-  final MatchingConfigRepository matchingConfigRepository;
-  final MatchingService Function(double threshold)? createMatchingService;
+  final PersistedMatchRepository persistedMatchRepository;
   // Injected ViewModels remain owned by the caller.
   final HomeViewModel? viewModel;
   // Receives the same Home configuration for S12's Back to Home action.
@@ -59,6 +58,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final HomeViewModel _viewModel;
   late final bool _ownsViewModel;
+  final _homeLoadTime = Stopwatch();
 
   @override
   void initState() {
@@ -70,27 +70,74 @@ class _HomeScreenState extends State<HomeScreen> {
           authService: widget.authService,
           lostReportRepository: widget.lostReportRepository,
           foundItemRepository: widget.foundItemRepository,
-          matchingConfigRepository: widget.matchingConfigRepository,
-          createMatchingService: widget.createMatchingService,
+          persistedMatchRepository: widget.persistedMatchRepository,
         );
+    _homeLoadTime.start();
+    _viewModel.addListener(_trackMyReportShown);
     _viewModel.loadHome();
+  }
+
+  // Counted once per visit, when Home shows the student's own report. The time
+  // ends at the first frame with the report, not when loadHome also saves the
+  // cache.
+  void _trackMyReportShown() {
+    if (!mounted || _viewModel.activeReports.isEmpty) return;
+    _viewModel.removeListener(_trackMyReportShown);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_viewModel.activeReports.isEmpty) {
+        // The report went away before it was drawn: wait for the next one.
+        _viewModel.addListener(_trackMyReportShown);
+        return;
+      }
+      widget.featureUsageTracker.track(
+        AppFeature.viewMyReport,
+        responseTime: _homeLoadTime.elapsed,
+      );
+    });
   }
 
   @override
   void dispose() {
+    _viewModel.removeListener(_trackMyReportShown);
     if (_ownsViewModel) _viewModel.dispose();
     super.dispose();
   }
 
-  void _openMatchAlert() {
-    final report = _viewModel.activeReport;
-    final match = _viewModel.bestMatch;
-    if (report == null || match == null) return;
+  // Opens a report screen and records the time until its first frame is drawn.
+  Future<void> _openReportScreen(AppFeature feature, Route<void> route) {
+    final stopwatch = Stopwatch()..start();
+    final opened = _pushAndRefresh(route);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.featureUsageTracker.track(
+        feature,
+        responseTime: stopwatch.elapsed,
+      );
+    });
+    return opened;
+  }
 
-    Navigator.of(context).push(
+  Future<void> _pushAndRefresh(Route<void> route) async {
+    await Navigator.of(context).push(route);
+    if (mounted) await _viewModel.refresh();
+  }
+
+  Future<void> _openMatchAlert(ActiveReportItem item) async {
+    final match = await _viewModel.openPossibleMatch(item);
+    if (!mounted) return;
+    if (match == null) {
+      final message = _viewModel.matchErrorMessage;
+      if (message != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+      return;
+    }
+
+    _pushAndRefresh(
       MaterialPageRoute<void>(
         builder: (context) =>
-            MatchAlertScreen(lostReport: report, matchResult: match),
+            MatchAlertScreen(lostReport: item.report, matchResult: match),
       ),
     );
   }
@@ -100,13 +147,12 @@ class _HomeScreenState extends State<HomeScreen> {
       authService: _viewModel.authService,
       lostReportRepository: _viewModel.lostReportRepository,
       foundItemRepository: _viewModel.foundItemRepository,
-      matchingConfigRepository: _viewModel.matchingConfigRepository,
-      createMatchingService: _viewModel.createMatchingService,
+      persistedMatchRepository: _viewModel.persistedMatchRepository,
       dropOffBuilder: widget.dropOffBuilder,
     );
     Widget homeBuilder(BuildContext context) => home;
 
-    Navigator.of(context).push(
+    _pushAndRefresh(
       MaterialPageRoute<void>(
         builder: (context) =>
             widget.dropOffBuilder?.call(context, homeBuilder) ??
@@ -122,8 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final authService = _viewModel.authService;
       final lostReportRepository = _viewModel.lostReportRepository;
       final foundItemRepository = _viewModel.foundItemRepository;
-      final matchingConfigRepository = _viewModel.matchingConfigRepository;
-      final createMatchingService = _viewModel.createMatchingService;
+      final persistedMatchRepository = _viewModel.persistedMatchRepository;
       // Removes Home so the back button cannot reopen the signed-out session.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
@@ -133,8 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
               authService: authService,
               lostReportRepository: lostReportRepository,
               foundItemRepository: foundItemRepository,
-              matchingConfigRepository: matchingConfigRepository,
-              createMatchingService: createMatchingService,
+              persistedMatchRepository: persistedMatchRepository,
             ),
           ),
         ),
@@ -159,164 +203,193 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.white,
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Yellow header from the Figma design
-              Container(
-                height: 92,
-                color: const Color(0xFFFEFD05),
-                padding: const EdgeInsets.only(left: 22, right: 15),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(top: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'uniandes',
-                              style: TextStyle(
-                                fontSize: 25,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                                height: 1.2,
+        child: RefreshIndicator(
+          onRefresh: _viewModel.refresh,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Yellow header from the Figma design
+                Container(
+                  height: 92,
+                  color: const Color(0xFFFEFD05),
+                  padding: const EdgeInsets.only(left: 22, right: 15),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(top: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'uniandes',
+                                style: TextStyle(
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black,
+                                  height: 1.2,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 1),
-                            Text(
-                              'Lost & Found',
-                              style: TextStyle(
-                                fontSize: 25,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black,
-                                height: 1.2,
+                              SizedBox(height: 1),
+                              Text(
+                                'Lost & Found',
+                                style: TextStyle(
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black,
+                                  height: 1.2,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 1),
-                            Text(
-                              'Find or return an item',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w300,
-                                color: Colors.black,
-                                height: 1.2,
+                              SizedBox(height: 1),
+                              Text(
+                                'Find or return an item',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.black,
+                                  height: 1.2,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: _viewModel.isSigningOut ? null : _signOut,
-                      tooltip: 'Sign out',
-                      constraints: const BoxConstraints.tightFor(
-                        width: 44,
-                        height: 44,
+                      IconButton(
+                        onPressed: _viewModel.isSigningOut ? null : _signOut,
+                        tooltip: 'Sign out',
+                        constraints: const BoxConstraints.tightFor(
+                          width: 44,
+                          height: 44,
+                        ),
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          size: 28,
+                          color: Colors.black,
+                        ),
                       ),
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        size: 28,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'What do you need?',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black,
-                        height: 1.2,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'What do you need?',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                          height: 1.2,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    HomeActionCard(
-                      icon: Icons.search,
-                      title: 'Search found items',
-                      subtitle: 'Check if something similar has already been registered.',
-                      large: true,
-                      onTap: () => widget.featureUsageTracker.track(
-                        AppFeature.searchFoundItems,
+                      const SizedBox(height: 18),
+                      HomeActionCard(
+                        icon: Icons.search,
+                        title: 'Search found items',
+                        subtitle: 'Check if something similar has already been registered.',
+                        large: true,
+                        onTap: () => widget.featureUsageTracker.track(
+                          AppFeature.searchFoundItems,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    HomeActionCard(
-                      icon: Icons.report_outlined,
-                      title: 'I lost an item',
-                      subtitle: 'Report it and get notified if it is found.',
-                      onTap: () {
-                        widget.featureUsageTracker.track(
-                          AppFeature.reportLostItem,
-                        );
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (context) => ReportLostItemScreen(
-                              featureUsageTracker: widget.featureUsageTracker,
+                      const SizedBox(height: 16),
+                      HomeActionCard(
+                        icon: Icons.report_outlined,
+                        title: 'I lost an item',
+                        subtitle: 'Report it and get notified if it is found.',
+                        onTap: () {
+                          _openReportScreen(
+                            AppFeature.reportLostItem,
+                            MaterialPageRoute<void>(
+                              builder: (context) => ReportLostItemScreen(
+                                featureUsageTracker: widget.featureUsageTracker,
+                              ),
                             ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      HomeActionCard(
+                        icon: Icons.add,
+                        title: 'I found an item',
+                        subtitle: 'Report it and see where to deliver it.',
+                        highlighted: true,
+                        onTap: () {
+                          // Report screen with the GPS location of the item.
+                          _openReportScreen(
+                            AppFeature.reportFoundItem,
+                            MaterialPageRoute<void>(
+                              builder: widget.foundItemScreenBuilder,
+                            ),
+                          );
+                        },
+                      ),
+                      if (_viewModel.isOffline)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 16),
+                          child: Text(
+                            'Offline: showing previously loaded information',
+                            style: TextStyle(fontSize: 13, color: Colors.grey),
                           ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    HomeActionCard(
-                      icon: Icons.add,
-                      title: 'I found an item',
-                      subtitle: 'Report it and see where to deliver it.',
-                      highlighted: true,
-                      onTap: () {
-                        widget.featureUsageTracker.track(
-                          AppFeature.reportFoundItem,
-                        );
-                        // Report screen with the GPS location of the item.
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: widget.foundItemScreenBuilder,
-                          ),
-                        );
-                      },
-                    ),
-                    if (_viewModel.isLoading)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 36),
-                        child: Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              semanticsLabel: 'Loading active report',
+                        ),
+                      if (_viewModel.isLoading)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 36),
+                          child: Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                semanticsLabel: 'Loading active reports',
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    if (_viewModel.activeReport != null)
-                      _buildActiveReportSection(_viewModel.activeReport!),
-                    if (_viewModel.errorMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Text(
-                          _viewModel.errorMessage!,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF999798),
+                      if (_viewModel.activeReports.isNotEmpty) ...[
+                        const SizedBox(height: 36),
+                        const Text(
+                          'My active reports',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                      ),
-                  ],
+                        const SizedBox(height: 13),
+                        ListView.separated(
+                          primary: false,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: EdgeInsets.zero,
+                          itemCount: _viewModel.activeReports.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (_, index) => _buildActiveReportCard(
+                            _viewModel.activeReports[index],
+                          ),
+                        ),
+                      ],
+                      if (_viewModel.errorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Text(
+                            _viewModel.errorMessage!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF999798),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -331,9 +404,10 @@ class _HomeScreenState extends State<HomeScreen> {
             child: BottomNavigationBar(
               currentIndex: 0,
               onTap: (index) {
+                if (index == 0) _viewModel.refresh();
                 // Alerts tab: notifications sent by the backend (Sofia).
                 if (index == 2) {
-                  Navigator.of(context).push(
+                  _pushAndRefresh(
                     MaterialPageRoute<void>(
                       builder: (context) => const NotificationsScreen(),
                     ),
@@ -372,7 +446,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildActiveReportSection(LostReport report) {
+  Widget _buildActiveReportCard(ActiveReportItem item) {
+    final report = item.report;
     final location = report.locationName.trim();
     final age = reportAge(report.reportedAt);
     final subtitle = location.isEmpty ? age : 'Lost in $location · $age';
@@ -383,18 +458,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 36),
-        const Text(
-          'My active report',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black,
-            height: 1.2,
-          ),
-        ),
-        const SizedBox(height: 13),
         Container(
+          key: ValueKey('active-report-${report.id}'),
           constraints: const BoxConstraints(minHeight: 116),
           padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
           decoration: BoxDecoration(
@@ -445,7 +510,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         height: 1.2,
                       ),
                     ),
-                    if (_viewModel.bestMatch != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      item.statusLabel,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    if (item.possibleMatch != null) ...[
                       const SizedBox(height: 16),
                       Semantics(
                         button: true,
@@ -456,7 +526,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: InkWell(
-                            onTap: _openMatchAlert,
+                            onTap: _viewModel.isOpeningMatch(report.id)
+                                ? null
+                                : () => _openMatchAlert(item),
                             borderRadius: BorderRadius.circular(10),
                             child: const SizedBox(
                               width: 120,

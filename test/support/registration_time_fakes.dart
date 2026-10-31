@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:campusfind_flutter/features/analytics/data/report_registration_metric_repository.dart';
+import 'package:campusfind_flutter/features/analytics/domain/report_registration_metric_repository.dart';
 import 'package:campusfind_flutter/features/analytics/data/report_registration_time_repository.dart';
 import 'package:campusfind_flutter/features/analytics/domain/report_registration_time_summary.dart';
 import 'package:campusfind_flutter/features/analytics/services/report_registration_time_aggregation_service.dart';
@@ -24,13 +24,16 @@ ReportRegistrationTimeSummary registrationSummary({
 );
 
 class FakeRegistrationMetricRepository
-    extends ReportRegistrationMetricRepository {
+    implements ReportRegistrationMetricRepository {
+  @override
+  String? get currentUserId => 'student-1';
   final records = <Map<String, Object>>[];
   Object? error;
   Completer<void>? pending;
 
   @override
   Future<void> record({
+    required String? uid,
     required String reportType,
     required int durationMs,
   }) async {

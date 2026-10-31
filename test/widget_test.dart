@@ -1,14 +1,13 @@
 import 'dart:async';
 
 import 'package:campusfind_flutter/app/campus_find_app.dart';
-import 'package:campusfind_flutter/core/data/lost_report_repository.dart';
 import 'package:campusfind_flutter/core/theme/app_theme.dart';
 import 'package:campusfind_flutter/features/auth/viewmodel/auth_view_model.dart';
 
 import 'package:campusfind_flutter/features/auth/presentation/login_screen.dart';
 import 'package:campusfind_flutter/features/home/presentation/home_screen.dart';
 import 'package:campusfind_flutter/viewmodels/item_viewmodel.dart';
-import 'package:campusfind_flutter/views/report_item_screen.dart';
+import 'package:campusfind_flutter/features/reports/presentation/report_item_screen.dart';
 import 'package:campusfind_flutter/services/location_service.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -17,11 +16,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'support/auth_fakes.dart';
-import 'support/firestore_fakes.dart';
+import 'support/home_fakes.dart';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'support/test_fonts.dart';
 
 void main() {
   setUpAll(loadTestFonts);
+  setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('Login screen displays the access options', (
     WidgetTester tester,
@@ -98,9 +101,7 @@ void main() {
             theme: AppTheme.lightTheme,
             home: HomeScreen(
               authService: FakeAuthService(savedSession: true),
-              lostReportRepository: LostReportRepository(
-                firestore: FakeFirestore(),
-              ),
+              lostReportRepository: HomeReports()..data = [],
             ),
           ),
         ),
@@ -396,9 +397,7 @@ void main() {
       MaterialApp(
         home: HomeScreen(
           authService: FakeAuthService(savedSession: true),
-          lostReportRepository: LostReportRepository(
-            firestore: FakeFirestore(),
-          ),
+          lostReportRepository: HomeReports()..data = [],
           foundItemScreenBuilder: _foundItemForm,
         ),
       ),
@@ -433,9 +432,7 @@ Future<void> _pumpLogin(
         viewModel: viewModel,
         homeBuilder: (context) => HomeScreen(
           authService: auth,
-          lostReportRepository: LostReportRepository(
-            firestore: FakeFirestore(),
-          ),
+          lostReportRepository: HomeReports()..data = [],
         ),
       ),
     ),

@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit reviews every pull request into dev and main against the code
+# conventions in CONTRIBUTING.md (section 9). Reply to a comment with
+# "@coderabbitai" to discuss it, or "@coderabbitai review" to review again.
+language: en-US
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+  sequence_diagrams: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - dev
+      - main
+  path_filters:
+    - "!**/*.lock"
+    - "!**/*.g.dart"
+    - "!**/*.freezed.dart"
+    - "!build/**"
+    - "!android/app/build/**"
+    - "!**/generated_plugin_registrant.*"
+  path_instructions:
+    - path: "lib/**/*.dart"
+      instructions: |
+        Check the code against section 9 of CONTRIBUTING.md:
+        - New code goes in lib/features/<feature>/ with data/, domain/, viewmodel/ and presentation/; shared code in lib/core/. Flag any new file in the legacy folders lib/models, lib/views, lib/viewmodels, lib/services, lib/DAOs or lib/utils.
+        - Screen state lives in a ViewModel: file <name>_view_model.dart in viewmodel/, class <Name>ViewModel extending ChangeNotifier. Flag classes or files named *Controller that hold screen state (Flutter's TextEditingController, AnimationController, ScrollController and the like are fine), and *_viewmodel.dart files.
+        - Widgets and ViewModels never use FirebaseFirestore.instance, FirebaseAuth.instance, FirebaseStorage.instance or HTTP clients directly: they go through a repository whose interface is in domain/ and whose implementation is in data/.
+        - Dependencies come in through the constructor (with a production default) so tests can pass fakes; no BuildContext, Navigator or widgets inside ViewModels.
+        - File and folder names are snake_case; classes UpperCamelCase.
+        - No print; no empty catch blocks; user-facing error messages separate from the logged reason; no secrets or API keys in code.
+    - path: "lib/features/**/presentation/**"
+      instructions: |
+        Presentation only builds widgets and forwards user actions to the ViewModel. Flag business rules, data fetching, Firestore queries or long computations here.
+    - path: "lib/features/**/data/**"
+      instructions: |
+        Repository implementations are named <Name>RepositoryImpl in <name>_repository_impl.dart and implement the interface from domain/. Check offline behavior (timeouts, cached or queued data) and that Firestore field names match the backend rules.
+    - path: "test/**"
+      instructions: |
+        Tests use the fakes in test/support instead of real Firebase. New ViewModel or repository logic should come with unit tests; flag PRs that change that logic without tests.
+  tools:
+    shellcheck:
+      enabled: true
+    yamllint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    markdownlint:
+      enabled: true
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - CONTRIBUTING.md
+chat:
+  auto_reply: true

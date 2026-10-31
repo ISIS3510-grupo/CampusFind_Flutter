@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../analytics/data/firestore_feature_usage_tracker.dart';
+import '../../analytics/domain/app_feature.dart';
+import '../../analytics/domain/feature_usage_tracker.dart';
 import '../../analytics/presentation/analytics_dashboard_screen.dart';
 import '../../analytics/presentation/feature_usage_panel.dart';
 import '../../home/presentation/home_screen.dart';
@@ -18,6 +21,7 @@ class LoginScreen extends StatefulWidget {
     this.homeBuilder,
     this.staffDashboardBuilder,
     this.viewModel,
+    this.featureUsageTracker = const FirestoreFeatureUsageTracker(),
   });
 
   final AuthService authService;
@@ -26,6 +30,7 @@ class LoginScreen extends StatefulWidget {
   final WidgetBuilder? staffDashboardBuilder;
   // Injected ViewModels remain owned by the caller.
   final AuthViewModel? viewModel;
+  final FeatureUsageTracker featureUsageTracker;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -56,11 +61,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleStudentAccess() async {
     if (_viewModel.isBusy || _showingSignInDialog) return;
+    final stopwatch = Stopwatch()..start();
     await _viewModel.requestStudentAccess();
     if (!mounted) return;
     if (_viewModel.needsPasswordSignIn) {
       await _showSignInDialog();
     } else if (_viewModel.isAuthenticated) {
+      widget.featureUsageTracker.track(
+        AppFeature.biometricLogin,
+        responseTime: stopwatch.elapsed,
+      );
       _openHome();
     } else if (_viewModel.errorMessage != null) {
       ScaffoldMessenger.of(context)
@@ -90,16 +100,21 @@ class _LoginScreenState extends State<LoginScreen> {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     setState(() => _showingSignInDialog = true);
     try {
-      final signedIn = await showDialog<bool>(
+      // The dialog returns how long the sign-in took, or null if it was closed.
+      final signInTime = await showDialog<Duration>(
         context: context,
         barrierDismissible: false,
         builder: (context) =>
             _SignInDialog(viewModel: _viewModel, isStaff: isStaff),
       );
-      if (signedIn == true && mounted) {
+      if (signInTime != null && mounted) {
         if (isStaff) {
           _openStaffDashboard();
         } else {
+          widget.featureUsageTracker.track(
+            AppFeature.passwordLogin,
+            responseTime: signInTime,
+          );
           _openHome();
         }
       }
@@ -390,6 +405,7 @@ class _SignInDialogState extends State<_SignInDialog> {
     final signIn = widget.isStaff
         ? widget.viewModel.signInAdmin
         : widget.viewModel.signInStudent;
+    final stopwatch = Stopwatch()..start();
     final signedIn = await signIn(
       _emailController.text,
       _passwordController.text,
@@ -397,7 +413,7 @@ class _SignInDialogState extends State<_SignInDialog> {
     if (!mounted) return;
 
     if (signedIn) {
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(stopwatch.elapsed);
     }
   }
 
