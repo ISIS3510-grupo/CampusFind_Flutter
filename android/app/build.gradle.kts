@@ -18,6 +18,11 @@ android {
     }
 
     defaultConfig {
+        // Base64 SHA-1 of the signing key, for the Microsoft sign-in redirect
+        // (msauth://com.campusfind.flutter/<hash>). Both build types are signed
+        // with the debug key for now; when release uses campusfind-release.jks
+        // its hash is /BQqEqoIaZ3MzaNS2FII/bJQRZI= (also registered in Entra).
+        manifestPlaceholders["msalSignatureHash"] = "Le5IXz2RQmCQU0/je+P+g4d4T7s="
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.campusfind.flutter"
         // You can update the following values to match your application needs.
