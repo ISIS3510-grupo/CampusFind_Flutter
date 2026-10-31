@@ -12,8 +12,14 @@ class MatchAnalyticsService {
     });
   }
 
-  // Devuelve las notificaciones en tiempo real
-  Stream<QuerySnapshot> getNotificationsStream() {
+  // Devuelve las notificaciones en tiempo real (todas para admin, o filtradas por recipientUid para estudiante)
+  Stream<QuerySnapshot> getNotificationsStream({String? recipientUid}) {
+    if (recipientUid != null && recipientUid.isNotEmpty) {
+      return _firestore
+          .collection('notifications')
+          .where('recipientUid', isEqualTo: recipientUid)
+          .snapshots();
+    }
     return _firestore.collection('notifications').snapshots();
   }
 }

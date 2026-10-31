@@ -15,7 +15,10 @@ class NotificationModel {
     this.viewedAt,
   });
 
-  factory NotificationModel.fromFirestore(Map<String, dynamic> data, String id) {
+  factory NotificationModel.fromFirestore(
+    Map<String, dynamic> data,
+    String id,
+  ) {
     return NotificationModel(
       id: id,
       channel: data['channel'] ?? '',

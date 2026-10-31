@@ -1,36 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
- 
+
 import '../../../viewmodels/item_viewmodel.dart';
 import '../../../models/campus_locations.dart';
- 
+
 class ReportItemScreen extends StatefulWidget {
+  //Stateful widget is used for forms since it is necessay a dynamic interactions
   const ReportItemScreen({super.key, required this.reportType})
     : assert(reportType == 'found' || reportType == 'lost');
- 
+
   final String reportType;
- 
+
   @override
   State<ReportItemScreen> createState() => _ReportItemScreenState();
 }
- 
+
 class _ReportItemScreenState extends State<ReportItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _categoryController = TextEditingController();
- 
-  static const Color uniandesYellow = Color(0xFFFFF200);
- 
+
+  static const Color _yellow = Color(0xFFFEFD05);
+  static const Color _border = Color(0xFFE2DEDE);
+  static const Color _grey = Color(0xFF999798);
+
+  // Categorías canónicas de Emilio para el algoritmo de matching (40% del score)
+  static const List<String> _canonicalCategories = [
+    'electronics',
+    'documents',
+    'keys',
+    'bags',
+    'clothing',
+    'accessories',
+    'other',
+  ];
+
+  static String _label(String category) =>
+      category.isEmpty ? '' : category[0].toUpperCase() + category.substring(1);
+
   @override
   void initState() {
-    super.initState();
+    super.initState(); //se ejecuta una sola vez al crear el widget.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<ItemViewModel>().loadPrioritizedLocations();
-    });
+      context.read<ItemViewModel>().loadPrioritizedLocations(); //se utiliza .read porque no se suscribe a escuchar cambios.
+    }); //comienza el flujo. Es una función que se llama una vez empieza el flujo.
   }
- 
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -38,16 +55,17 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     _categoryController.dispose();
     super.dispose();
   }
- 
-  // Sin async/await: el ViewModel avisa el resultado con el callback onDone.
+
   void _submitForm(ItemViewModel viewModel) {
     if (!_formKey.currentState!.validate()) return;
- 
+
+    final normalizedCategory = _categoryController.text.trim().toLowerCase();
+
     viewModel.reportItem(
       reportType: widget.reportType,
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
-      category: _categoryController.text.trim(),
+      category: normalizedCategory,
       onDone: (bool success) {
         if (!mounted) return;
         if (success) {
@@ -55,71 +73,151 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
             const SnackBar(
               backgroundColor: Colors.black,
               content: Text(
-                'Objeto reportado con éxito con ubicación del campus',
+                'Item reported successfully with campus location',
                 style: TextStyle(color: Colors.white),
               ),
             ),
           );
           _formKey.currentState!.reset();
+          setState(() {
+            _categoryController.clear();
+          });
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              backgroundColor: Colors.red[700],
-              content: Text(viewModel.errorMessage ?? 'Error al guardar'),
+              backgroundColor: Colors.black,
+              content: Text(
+                viewModel.errorMessage ?? 'Error saving report',
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
           );
         }
       },
     );
   }
- 
+
+  InputDecoration _decoration(
+    String label, {
+    String? hint,
+    Widget? prefixIcon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: prefixIcon,
+      hintStyle: const TextStyle(color: _grey, fontWeight: FontWeight.w300),
+      labelStyle: const TextStyle(color: Colors.black87),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: _border),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(10)),
+        borderSide: BorderSide(color: Colors.black, width: 1.5),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // once he receives updates from notifyListeners he rebuilds the view. He is an Observer
     final viewModel = context.watch<ItemViewModel>();
- 
+
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: _yellow,
+        foregroundColor: Colors.black,
+        elevation: 0,
         title: Text(
           widget.reportType == 'found'
               ? 'Report Found Item'
               : 'Report Lost Item',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SafeArea(
         child: Form(
           key: _formKey,
           child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             children: [
               TextFormField(
                 controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Título'),
+                decoration: _decoration('Title', hint: 'Name of the item (e.g. Casio calculator)'),
                 validator: (val) => val == null || val.trim().isEmpty
-                    ? 'Ingresa un título'
+                    ? 'Please enter a title'
                     : null,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Descripción'),
+                maxLines: 2,
+                decoration: _decoration(
+                  'Description',
+                  hint: 'Color, brand, visible details...',
+                ),
                 validator: (val) => val == null || val.trim().isEmpty
-                    ? 'Ingresa una descripción'
+                    ? 'Please enter a description'
                     : null,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _categoryController,
-                decoration: const InputDecoration(labelText: 'Categoría'),
+                decoration: _decoration(
+                  'Category',
+                  hint: 'Select below or type (e.g. electronics)',
+                ),
                 validator: (val) => val == null || val.trim().isEmpty
-                    ? 'Ingresa una categoría'
+                    ? 'Please enter a category'
                     : null,
+                onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: _canonicalCategories.map((cat) {
+                  final isSelected =
+                      _categoryController.text.trim().toLowerCase() == cat;
+                  return ChoiceChip(
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    label: Text(
+                      _label(cat),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: Colors.black,
+                      ),
+                    ),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        _categoryController.text = selected ? cat : '';
+                      });
+                    },
+                    backgroundColor: Colors.white,
+                    selectedColor: _yellow,
+                    side: BorderSide(
+                      color: isSelected ? Colors.black : _border,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
               const Text(
-                'Ubicación en el Campus',
+                'Campus Location',
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w500,
                   color: Colors.black,
                 ),
               ),
@@ -127,18 +225,16 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
               viewModel.isLoadingLocation
                   ? const LinearProgressIndicator(
                       color: Colors.black,
-                      backgroundColor: uniandesYellow,
+                      backgroundColor: _yellow,
                     )
                   : DropdownButtonFormField<CampusLocation>(
+                      // muestra la sugerencia
                       // Nombres largos se cortan con "..." en vez de desbordar.
                       isExpanded: true,
                       initialValue: viewModel.selectedLocation,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.black, width: 2),
-                        ),
-                        prefixIcon: Icon(
+                      decoration: _decoration(
+                        'Location',
+                        prefixIcon: const Icon(
                           Icons.location_on,
                           color: Colors.black,
                         ),
@@ -149,12 +245,12 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                           value: loc,
                           child: Text(
                             isClosest
-                                ? '${loc.name} (Sugerido - Más cercano)'
+                                ? '${loc.name} (Suggested - Closest)'
                                 : loc.name,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontWeight: isClosest
-                                  ? FontWeight.bold
+                                  ? FontWeight.w500
                                   : FontWeight.normal,
                               color: isClosest ? Colors.black : Colors.black87,
                             ),
@@ -165,32 +261,28 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                         viewModel.selectLocation(newLocation);
                       },
                     ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               viewModel.isLoading
                   ? const Center(
                       child: CircularProgressIndicator(color: Colors.black),
                     )
                   : SizedBox(
-                      height: 50,
+                      height: 52,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: uniandesYellow,
+                          backgroundColor: _yellow,
                           foregroundColor: Colors.black,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(
-                              color: Colors.black,
-                              width: 1.5,
-                            ),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
                         onPressed: () => _submitForm(viewModel),
                         child: const Text(
-                          'Guardar Reporte',
+                          'Save Report',
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -202,4 +294,3 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
     );
   }
 }
- 

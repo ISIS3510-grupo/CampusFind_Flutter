@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:campusfind_flutter/app/campus_find_app.dart';
 import 'package:campusfind_flutter/core/network/connectivity_service.dart';
+import 'package:campusfind_flutter/features/analytics/services/offline_sync_time_tracker.dart';
 import 'package:campusfind_flutter/features/reports/data/lost_report_repository_impl.dart';
 import 'package:campusfind_flutter/features/reports/data/pending_report_sync.dart';
 import 'package:campusfind_flutter/firebase_options.dart';
@@ -24,6 +25,8 @@ Future<void> main() async {
     signedInChanges: FirebaseAuth.instance.authStateChanges().map(
       (user) => user != null,
     ),
+    // Records how long each recovery takes (analytics: offline sync time).
+    tracker: OfflineSyncTimeTracker(),
   ).start();
 
   runApp(
