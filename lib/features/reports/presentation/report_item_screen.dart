@@ -141,7 +141,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             children: [
               TextFormField(
                 controller: _titleController,
@@ -153,7 +153,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
               const SizedBox(height: 14),
               TextFormField(
                 controller: _descriptionController,
-                maxLines: 3,
+                maxLines: 2,
                 decoration: _decoration(
                   'Description',
                   hint: 'Color, brand, visible details...',
@@ -182,6 +182,8 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                   final isSelected =
                       _categoryController.text.trim().toLowerCase() == cat;
                   return ChoiceChip(
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     label: Text(
                       _label(cat),
                       style: TextStyle(
@@ -209,7 +211,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               const Text(
                 'Campus Location',
                 style: TextStyle(
@@ -258,7 +260,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
                         viewModel.selectLocation(newLocation);
                       },
                     ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
               viewModel.isLoading
                   ? const Center(
                       child: CircularProgressIndicator(color: Colors.black),

@@ -177,7 +177,9 @@ void main() {
       expect(find.text('Report Lost Item'), findsOneWidget);
       expect(find.byType(TextFormField), findsNWidgets(3));
       expect(find.text('Correo Uniandes'), findsNothing);
-      await tester.tap(find.byType(ElevatedButton));
+      final submitButton = find.byType(ElevatedButton);
+      await tester.ensureVisible(submitButton);
+      await tester.tap(submitButton);
       await tester.pumpAndSettle();
       expect(database.documentWrites, isEmpty);
       expect(metrics.records, isEmpty);
@@ -185,7 +187,8 @@ void main() {
       await tester.enterText(fields.at(0), 'Calculator');
       await tester.enterText(fields.at(1), 'Black');
       await tester.enterText(fields.at(2), 'electronics');
-      await tester.tap(find.byType(ElevatedButton));
+      await tester.ensureVisible(submitButton);
+      await tester.tap(submitButton);
       await tester.pumpAndSettle();
       expect(database.documentWrites.single['path'], 'lostReports/auto-1');
       expect(metrics.records.single['reportType'], 'lost');
