@@ -48,6 +48,7 @@ dependencies:
   shared_preferences: ^2.5.5
   path_provider: ^2.1.6
   cloud_functions: ^6.5.0
+  msal_auth: ^3.5.3
 
 dev_dependencies:
   flutter_test:
@@ -72,6 +73,10 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
+  assets:
+    # Microsoft sign-in (MSAL) configuration for Android.
+    - assets/msal_config.json
+
   # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg

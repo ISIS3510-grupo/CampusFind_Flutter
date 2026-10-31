@@ -200,6 +200,7 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final stopwatch = Stopwatch()..start();
     final result = await _viewModel.submit(
       LostReportDraft(
         title: _title.text.trim(),
@@ -213,7 +214,10 @@ class _ReportLostItemScreenState extends State<ReportLostItemScreen> {
       ),
     );
     if (!mounted || result == null) return;
-    widget.featureUsageTracker.track(AppFeature.submitLostReport);
+    widget.featureUsageTracker.track(
+      AppFeature.submitLostReport,
+      responseTime: stopwatch.elapsed,
+    );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

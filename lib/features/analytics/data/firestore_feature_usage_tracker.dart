@@ -12,11 +12,24 @@ import 'package:campusfind_flutter/features/analytics/domain/feature_usage_track
 class FirestoreFeatureUsageTracker implements FeatureUsageTracker {
   const FirestoreFeatureUsageTracker();
 
+  // The Firestore rule accepts durationMs from 0 up to (not including) 10 minutes.
+  static const maxDurationMs = 600000;
+
+  // Milliseconds to store, or null when the use has no time or the time is out
+  // of range: the use is still recorded, only without durationMs.
+  @visibleForTesting
+  static int? storedDurationMs(Duration? responseTime) {
+    final ms = responseTime?.inMilliseconds;
+    if (ms == null || ms < 0 || ms >= maxDurationMs) return null;
+    return ms;
+  }
+
   @override
-  void track(AppFeature feature) {
+  void track(AppFeature feature, {Duration? responseTime}) {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
+      final durationMs = storedDurationMs(responseTime);
 
       final write = FirebaseFirestore.instance
           .collection('featureUsageEvents')
@@ -25,6 +38,7 @@ class FirestoreFeatureUsageTracker implements FeatureUsageTracker {
             'feature': feature.id,
             'platform': 'flutter',
             'occurredAt': FieldValue.serverTimestamp(),
+            'durationMs': ?durationMs,
           });
       unawaited(
         write.then<void>(

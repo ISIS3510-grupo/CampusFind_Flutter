@@ -58,6 +58,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final HomeViewModel _viewModel;
   late final bool _ownsViewModel;
+  final _homeLoadTime = Stopwatch();
 
   @override
   void initState() {
@@ -71,18 +72,49 @@ class _HomeScreenState extends State<HomeScreen> {
           foundItemRepository: widget.foundItemRepository,
           persistedMatchRepository: widget.persistedMatchRepository,
         );
-    _viewModel.loadHome().then((_) {
-      // Counted once per visit, when Home shows the student's own report.
-      if (mounted && _viewModel.activeReports.isNotEmpty) {
-        widget.featureUsageTracker.track(AppFeature.viewMyReport);
+    _homeLoadTime.start();
+    _viewModel.addListener(_trackMyReportShown);
+    _viewModel.loadHome();
+  }
+
+  // Counted once per visit, when Home shows the student's own report. The time
+  // ends at the first frame with the report, not when loadHome also saves the
+  // cache.
+  void _trackMyReportShown() {
+    if (!mounted || _viewModel.activeReports.isEmpty) return;
+    _viewModel.removeListener(_trackMyReportShown);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_viewModel.activeReports.isEmpty) {
+        // The report went away before it was drawn: wait for the next one.
+        _viewModel.addListener(_trackMyReportShown);
+        return;
       }
+      widget.featureUsageTracker.track(
+        AppFeature.viewMyReport,
+        responseTime: _homeLoadTime.elapsed,
+      );
     });
   }
 
   @override
   void dispose() {
+    _viewModel.removeListener(_trackMyReportShown);
     if (_ownsViewModel) _viewModel.dispose();
     super.dispose();
+  }
+
+  // Opens a report screen and records the time until its first frame is drawn.
+  Future<void> _openReportScreen(AppFeature feature, Route<void> route) {
+    final stopwatch = Stopwatch()..start();
+    final opened = _pushAndRefresh(route);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.featureUsageTracker.track(
+        feature,
+        responseTime: stopwatch.elapsed,
+      );
+    });
+    return opened;
   }
 
   Future<void> _pushAndRefresh(Route<void> route) async {
@@ -271,10 +303,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: 'I lost an item',
                         subtitle: 'Report it and get notified if it is found.',
                         onTap: () {
-                          widget.featureUsageTracker.track(
+                          _openReportScreen(
                             AppFeature.reportLostItem,
-                          );
-                          _pushAndRefresh(
                             MaterialPageRoute<void>(
                               builder: (context) => ReportLostItemScreen(
                                 featureUsageTracker: widget.featureUsageTracker,
@@ -290,11 +320,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         subtitle: 'Report it and see where to deliver it.',
                         highlighted: true,
                         onTap: () {
-                          widget.featureUsageTracker.track(
-                            AppFeature.reportFoundItem,
-                          );
                           // Report screen with the GPS location of the item.
-                          _pushAndRefresh(
+                          _openReportScreen(
+                            AppFeature.reportFoundItem,
                             MaterialPageRoute<void>(
                               builder: widget.foundItemScreenBuilder,
                             ),
