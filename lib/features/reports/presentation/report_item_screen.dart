@@ -43,6 +43,7 @@ class _ReportItemScreenState extends State<ReportItemScreen> {
   void initState() {
     super.initState(); //se ejecuta una sola vez al crear el widget.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<ItemViewModel>().loadPrioritizedLocations(); //se utiliza .read porque no se suscribe a escuchar cambios.
     }); //comienza el flujo. Es una función que se llama una vez empieza el flujo.
   }
