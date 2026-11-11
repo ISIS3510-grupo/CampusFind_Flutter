@@ -59,6 +59,9 @@ class NotificationsScreen extends StatelessWidget {
               );
 
               final bool isReviewed = notification.viewedAt != null;
+              final claimPin = notification.matchId.isNotEmpty
+                  ? '#${notification.matchId.toUpperCase()}'
+                  : 'N/A';
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -77,15 +80,37 @@ class NotificationsScreen extends StatelessWidget {
                     color: isReviewed ? Colors.green : Colors.blue,
                   ),
                   title: Text(
-                    'Coincidencia encontrada (Match: ${notification.matchId})',
+                    isReviewed
+                        ? 'Coincidencia verificada'
+                        : '¡Posible coincidencia encontrada!',
                     style: TextStyle(
                       fontWeight: isReviewed ? FontWeight.normal : FontWeight.w600,
                     ),
                   ),
-                  subtitle: Text(
-                    isReviewed
-                        ? 'Canal: ${notification.channel} · Revisada'
-                        : 'Canal: ${notification.channel} · Toca para revisar',
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'PIN de reclamo: $claimPin',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isReviewed
+                              ? 'Listo para reclamar en la oficina de objetos perdidos.'
+                              : 'Toca para revisar y confirmar entrega en la oficina.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   trailing: notification.sentAt != null
                       ? Text(
@@ -103,13 +128,13 @@ class NotificationsScreen extends StatelessWidget {
                     );
                     if (!isReviewed) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
+                        SnackBar(
                           backgroundColor: Colors.black,
                           content: Text(
-                            'Match marcado como revisado. Métrica BQ actualizada.',
-                            style: TextStyle(color: Colors.white),
+                            'Match marcado como revisado. Presenta el PIN $claimPin en la oficina para reclamar tu objeto.',
+                            style: const TextStyle(color: Colors.white),
                           ),
-                          duration: Duration(seconds: 2),
+                          duration: const Duration(seconds: 3),
                         ),
                       );
                     }
